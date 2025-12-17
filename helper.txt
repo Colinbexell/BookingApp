@@ -1,0 +1,80 @@
+
+Initialisering
+
+Client:
+npm i vite@latest react-router-dom axios react-hot-toast 
+
+Server:
+npm i cors express nodemon bcrypt jsonwebtoken cookie-parser dotenv mongodb mongoose
+
+Ändra DB_URL i .env filen samt JWT_SECRET i .env filen.
+
+För att använda den rollbaserade inloggningen måste logik för det läggas till när användare skapas, annars sätt 
+role = "user" som default på alla och sätt detsamma på de routes som är under ProtectedRoutes. 
+
+För att systemhelvetet ska fungera på safari och vissa andra browsers MÅSTE följande göras:
+Destination i vercel.json måste ändras till respektive server destination exempelvis renders: https://appnamn.onrender.com/api/:path*
+
+Alla kallningar till servern måste ha formatet: /api/text_here och endpunkterna i servern måste kunna ta in det. Så i index.js ska det vara /api
+VIKTIGT att skapa en .env fil där följade kod finns:
+
+MODE = "production"
+# production eller development
+
+
+-------------------------------------------------------------------------------------------------
+
+För att få fatt i usern från någonstans i front enden använd följande kod:
+
+import { useContext } from "react";
+import { UserContext } from "../../context/userContext"; //Mind the directory location
+
+const {user} = useContext(UserContext)
+
+-------------------------------------------------------------------------------------------------
+
+Vad som finns i Authentication systemet:
+- Autentisering som kollar mail och lösenord före registrering.
+
+- Hashar lösenord i databasen och endast servern kan läsa av.
+
+- Använder json web token för att spara inloggningsinformation i cookies.
+
+- Rollbaserad åtkomst för routing med hjälp av ProtectedRoutes, gjord i en väldigt skalbar design.
+
+- Livslängden på tokensen är 7 dagar.
+
+- Rate limiting som gör att man har 5 försök per IP-adress när man loggar in därefter får man vänta en minut
+
+- CSRF-Skydd (Cross-Site Request Forgery), skydd mot cross-origin attacker via SameSite-cookies. Nuvarande är satt på "lax" mode 
+men kan placeras på "strict" vid extrem säkerhet. Det gör att externa länkar inte sparar cookies och tvingar logga in igen,
+"lax" är en blandning som ändå behåller grundläggande CSRF-skydd. På interna system kan man byta till "strict",
+skulle det vara problem, bara byta tillbaka.
+
+- Cookie-inställningar i "authController.js"
+    httpOnly: true → skyddar JWT mot XSS (Cross-Site Scripting)
+
+    secure: false → okej för lokal utveckling ⚠️ Ska sättas till "true" i produktion
+
+    maxAge → 7 dagar
+I 
+- Developer sida där jag kan lägga till konton manuellt, inklusive roller
+
+- Fungerar för Safari och är byggd för samesite, alltså frontend: www.namn.se och server: www.namn.se/api
+
+-------------------------------------------------------------------------------------------------
+
+Framtida tillägg:
+- Access tokens (Kort liv t.ex 15 min) & Refresh tokens (Längre liv t.ex 7-30 dagar)
+- Password reset flow (Vid behov)
+- 2FA vid extra känsliga system (tvåfaktorsautentisering)
+
+
+-------------------------------------------------------------------------------------------------
+
+Innan produktion:
+
+- Ändra till .env i .gitignore filen
+- Ändra domänen från localhost:5173 i cors inställningar inuti authRoutes.js
+- Ändra "secure" till "true" i cookieinställningar inuti authController.js
+- Även ändra "sameSite" till "strict" vid behov. i cookie inställningar i authController.js

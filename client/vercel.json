@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://banana-clicker-x8qy.onrender.com/api/:path*"
+    }
+  ]
+}

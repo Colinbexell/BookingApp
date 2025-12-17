@@ -1,0 +1,16 @@
+.dev_container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: start;
+  gap: 10vh;
+  height: 900px;
+}
+
+.dev_add_user {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
