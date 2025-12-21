@@ -3,6 +3,8 @@ import "./Home.css";
 import Lenis from "lenis";
 import Navbar from "../../components/navbar/Navbar";
 
+import BowlingBG from "../../assets/BowlingBG.jpg";
+
 const Home = () => {
   const mainRef = useRef(null);
   const s1 = useRef(null);
@@ -49,7 +51,7 @@ const Home = () => {
   // Background color change based on scroll position
   useEffect(() => {
     const sections = [
-      { el: s1.current, bg: "#473BF0", secondary: "#443accff" },
+      { el: s1.current, bg: "#ebebebff", secondary: "#d9d9d9ff" },
       { el: s2.current, bg: "#ebebebff", secondary: "#d9d9d9ff" },
       { el: s3.current, bg: "#22333B", secondary: "#1e2d34ff" },
       { el: s4.current, bg: "#211A1E", secondary: "#2a2126ff" },
@@ -106,6 +108,7 @@ const Home = () => {
     <div className="main" ref={mainRef}>
       <Navbar />
       <div className="section" ref={s1}>
+        <img className="top_img" src={BowlingBG} alt="" />
         <h1>Section 1</h1>
         <p>
           Welcome to the first section. Scroll down to see the smooth

@@ -18,20 +18,17 @@
   scrollbar-color: var(--primary) var(--background);
 
   /* Colors */
-  --primary: #473bf0;
-  --secondary: #443accff;
+  --primary: #2eeabb;
+  --secondary: #27cca4;
   --red: #ff5a5a;
-  --background: #473bf0;
-  --background-secondary: #443accff;
-  --dark: #12151c;
+  --background: #ebebebff;
+  --background-secondary: #d9d9d9ff;
+  --text-dark: #12151c;
   --text: #ffffff;
-  --text-hover: rgb(46, 40, 137);
-  --lines: #373a40;
   --dot-brightness: 1;
   --bg-scroll: 0px;
 
-  --pink: #ff007f;
-  --pink-neon: #f9ffff;
+  --navbar: #161616c5;
 }
 
 /* Remove overflow hidden from root - let body scroll */
@@ -95,15 +92,21 @@ body {
 }
 
 .section {
-  min-height: 100vh;
   width: 100%;
+  min-height: 50vh;
   padding: 40px 20px;
 
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
+  justify-content: start;
+}
+
+.top_img {
+  width: 100vw;
+  height: 40vh;
+  object-fit: cover;
+  filter: blur(1.5px);
 }
 
 /* Utility classes */
