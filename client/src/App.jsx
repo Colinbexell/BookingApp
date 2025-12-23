@@ -4,6 +4,7 @@ import ProtectedRoute from "./utils/ProtectedRoute";
 
 // Imported paths
 import Home from "./pages/Home/Home";
+import Book from "./pages/Book/Book";
 import Dev from "./pages/Dev/Dev";
 import Login from "./pages/Authentication/Login";
 import Register from "./pages/Authentication/Register";
@@ -17,6 +18,7 @@ function App() {
     <>
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/book" element={<Book />} />
         <Route
           path="/developer"
           element={

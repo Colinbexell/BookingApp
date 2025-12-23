@@ -27,6 +27,8 @@
   --text: #ffffff;
   --dot-brightness: 1;
   --bg-scroll: 0px;
+  --border-radius: 10px;
+  --border-radius-2: 6px;
 
   --navbar: #161616c5;
 }
