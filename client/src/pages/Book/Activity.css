@@ -13,10 +13,14 @@
   border-radius: var(--border-radius);
   transition: all ease-in-out 0.2s;
   overflow: hidden;
+  cursor: pointer;
 }
 
 .main_card:hover {
-  height: 500px;
+  height: 450px;
+  transform: scale(1.05);
+  border: solid 1px var(--primary);
+  box-shadow: 0 3px 10px 6px var(--primary);
 }
 
 .info {
@@ -33,7 +37,14 @@
   border-radius: var(--border-radius-2);
 }
 
+.main_card h3 {
+  color: var(--text-dark);
+  font-weight: 600;
+  font-size: medium;
+}
+
 .main_card p {
   color: var(--text-dark);
   font-weight: 600;
+  font-size: small;
 }
