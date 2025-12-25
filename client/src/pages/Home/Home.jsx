@@ -105,7 +105,7 @@ const Home = () => {
   }, [scrollPos]);
 
   return (
-    <div className="main" ref={mainRef}>
+    <div className="main-home" ref={mainRef}>
       <Navbar />
       <div className="section" ref={s1}>
         <img className="top_img" src={BowlingBG} alt="" />

@@ -13,12 +13,13 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-y: scroll;
 
-  scrollbar-width: thin;
-  scrollbar-color: var(--primary) var(--background);
+  scrollbar-width: none;
 
   /* Colors */
   --primary: #2eeabb;
+  --primary-shadow: #2eeabb53;
   --secondary: #27cca4;
   --red: #ff5a5a;
   --background: #ebebebff;
@@ -56,8 +57,23 @@ body {
   transition: background-color 1s ease-in-out;
 }
 
+.main-home {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: start;
+
+  font-family: inherit;
+
+  position: relative;
+  background-color: var(--background);
+  transition: background-color 1s ease-in-out;
+}
+
 /* Dot pattern background - absolute positioned, moves with content */
-.main::before {
+.main-home::before {
   content: "";
   position: absolute;
   left: 0;
@@ -88,7 +104,7 @@ body {
 }
 
 /* Content over dots */
-.main > * {
+.main-home > * {
   position: relative;
   z-index: 1;
 }

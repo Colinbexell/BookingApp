@@ -1,6 +1,6 @@
 .main_card {
-  height: 230px;
-  width: 200px;
+  height: 350px;
+  width: 300px;
   background-color: blue;
   display: flex;
   flex-direction: column;
@@ -17,19 +17,21 @@
 }
 
 .main_card:hover {
-  height: 450px;
-  transform: scale(1.05);
+  height: 550px;
+  transform: scale(1.02);
   border: solid 1px var(--primary);
-  box-shadow: 0 3px 10px 6px var(--primary);
+  box-shadow: 0 3px 10px 6px var(--primary-shadow);
 }
 
+/* Info text på kortet */
 .info {
   display: none;
   width: 90%;
 }
-
-.main_card:hover .info {
-  display: block;
+.main_card:hover .info,
+.main_card:hover .amount,
+.main_card:hover .next {
+  display: flex;
 }
 
 .main_card img {
@@ -47,4 +49,56 @@
   color: var(--text-dark);
   font-weight: 600;
   font-size: small;
+}
+
+/* Amount diven där antalet timmar väljs */
+.amount {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  width: 90%;
+}
+/* Räknaren till höger på kortet */
+.counter {
+  display: flex;
+  width: 40%;
+  align-items: center;
+  justify-content: space-evenly;
+}
+
+/* Räknar knapp */
+.c_button {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  border: solid 2px var(--primary);
+  color: var(--primary);
+  transition: all ease-in-out 0.1s;
+  font-size: x-large;
+}
+
+.c_button:active {
+  background-color: var(--primary);
+  border: none;
+  color: white;
+  box-shadow: 0 3px 10px 6px var(--primary-shadow);
+  transform: scale(1.05);
+}
+
+.next {
+  display: none;
+  background-color: var(--primary);
+  color: white;
+  width: 80px;
+  height: 40px;
+  transition: all ease-in-out 0.2s;
+}
+
+.next:active {
+  box-shadow: 0 3px 10px 6px var(--primary-shadow);
+  transform: scale(1.05);
 }

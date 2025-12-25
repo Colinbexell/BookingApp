@@ -12,52 +12,48 @@ import Pool from "../../assets/Pool.jpg";
 
 const Home = () => {
   const [page, setpage] = useState(1);
+  const [bookData, setbookData] = useState({
+    activityId: null,
+    amount1: 0,
+    amount2: 0,
+  });
+
+  const [activities, setactivities] = useState([
+    {
+      title: "Bowling",
+      id: "bowling",
+      img: Bowling,
+      info: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy ",
+      cost: 349,
+    },
+  ]);
+
+  const updateBookData = (field, value, id) => {
+    setbookData({
+      ...bookData,
+      [field]: value,
+      activityId: id,
+    });
+  };
 
   const renderPage = () => {
     switch (page) {
       case 1:
         return (
           <div className="content">
-            <Activity
-              title={"Bowling"}
-              img={Bowling}
-              path={"test"}
-              info={
-                "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially"
-              }
-            />
-            <Activity
-              title={"Curling"}
-              img={Curling}
-              path={"test"}
-              info={
-                "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially"
-              }
-            />
-            <Activity
-              title={"Dart"}
-              img={Dart}
-              path={"test"}
-              info={
-                "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially"
-              }
-            />
-            <Activity
-              title={"Pool"}
-              img={Pool}
-              path={"test"}
-              info={
-                "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially"
-              }
-            />
-            <Activity
-              title={"Pingpong"}
-              img={Pingpong}
-              path={"test"}
-              info={
-                "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book. It has survived not only five centuries, but also the leap into electronic typesetting, remaining essentially"
-              }
-            />
+            {activities.map((act) => (
+              <Activity
+                key={act.id}
+                title={act.title}
+                id={act.id}
+                img={act.img}
+                info={act.info}
+                cost={act.cost}
+                updateBookData={updateBookData}
+                setpage={setpage}
+                bookData={bookData}
+              />
+            ))}
           </div>
         );
       case 2:
