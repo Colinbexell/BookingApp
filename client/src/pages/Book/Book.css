@@ -54,13 +54,37 @@
   height: auto;
   width: 80vw;
 
-  margin-top: 5vh;
+  margin-top: 10vh;
 
   display: flex;
   flex-direction: row;
   align-items: start;
   justify-content: center;
   gap: 20px;
+  color: var(--text-dark);
+}
+
+/* Välj tid */
+.booking-summary {
+  width: 300px;
+  height: auto;
+  box-shadow: 0 3px 10px 6px var(--primary-shadow);
+  border-radius: var(--border-radius);
+  padding: 10px;
+}
+
+.summary-item {
+  width: 100%;
+}
+
+.summary-item div {
+  display: flex;
+  width: 95%;
+  justify-content: space-between;
+}
+
+.booking-summary h3 {
+  font-size: medium;
 }
 
 @media (max-width: 768px) {

@@ -9,11 +9,11 @@ const Activity = ({
   cost,
   updateBookData,
   bookData,
-  setpage,
+  nextPage,
 }) => {
   return (
     <div className="main_card">
-      <img src={img} alt="" />
+      <img src={img} alt={title} />
       <h3>{title}</h3>
       <p className="info">{info}</p>
 
@@ -24,9 +24,9 @@ const Activity = ({
           <div
             className="c_button"
             onClick={() => {
-              bookData.amount1 > 0
-                ? updateBookData("amount1", bookData.amount1 - 1, id)
-                : null;
+              if (bookData.amount1 > 0) {
+                updateBookData("amount1", bookData.amount1 - 1, id);
+              }
             }}
           >
             -
@@ -40,6 +40,7 @@ const Activity = ({
           </div>
         </div>
       </div>
+
       <div className="amount">
         <p>{title} 2 timmar</p>
         <p className="cost">{cost * 2},00 kr</p>
@@ -47,9 +48,9 @@ const Activity = ({
           <div
             className="c_button"
             onClick={() => {
-              bookData.amount2 > 0
-                ? updateBookData("amount2", bookData.amount2 - 1, id)
-                : null;
+              if (bookData.amount2 > 0) {
+                updateBookData("amount2", bookData.amount2 - 1, id);
+              }
             }}
           >
             -
@@ -63,13 +64,8 @@ const Activity = ({
           </div>
         </div>
       </div>
-      <button
-        onClick={() => {
-          updateBookData("activityId", id, id);
-          setpage(2);
-        }}
-        className="next"
-      >
+
+      <button onClick={nextPage} className="next">
         Nästa
       </button>
     </div>

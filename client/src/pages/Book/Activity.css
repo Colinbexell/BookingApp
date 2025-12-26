@@ -91,6 +91,8 @@
 
 .next {
   display: none;
+  position: absolute;
+  bottom: 10px;
   background-color: var(--primary);
   color: white;
   width: 80px;
