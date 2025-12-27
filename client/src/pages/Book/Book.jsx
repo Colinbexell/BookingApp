@@ -241,8 +241,8 @@ const Home = () => {
             Ange info
           </p>
         </div>
-        <div className={page === 3 ? "progress_ball_active" : "progress_ball"}>
-          <p className={page === 3 ? "progress_txt_active" : "progress_txt"}>
+        <div className={page === 4 ? "progress_ball_active" : "progress_ball"}>
+          <p className={page === 4 ? "progress_txt_active" : "progress_txt"}>
             Slutför
           </p>
         </div>
