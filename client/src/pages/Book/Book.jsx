@@ -137,71 +137,85 @@ const Home = () => {
       case 1:
         return (
           <div className="content">
-            {activities.map((act) => (
-              <Activity
-                key={act.id}
-                title={act.title}
-                id={act.id}
-                img={act.img}
-                info={act.info}
-                cost={act.cost}
-                updateBookData={updateBookData}
-                nextPage={nextPage}
-                bookData={getActivityBookData(act.id)}
-              />
-            ))}
+            <div className="activities">
+              {activities.map((act) => (
+                <Activity
+                  key={act.id}
+                  title={act.title}
+                  id={act.id}
+                  img={act.img}
+                  info={act.info}
+                  cost={act.cost}
+                  updateBookData={updateBookData}
+                  nextPage={nextPage}
+                  bookData={getActivityBookData(act.id)}
+                />
+              ))}
+            </div>
           </div>
         );
       case 2:
         return (
           <div className="content">
-            <h3>Beställningsöversikt</h3>
-            <div className="booking-summary">
-              {bookData
-                .filter((book) => book.amount1 > 0 || book.amount2 > 0)
-                .map((book) => {
-                  const activity = activities.find(
-                    (act) => act.id === book.activityId
-                  );
-                  if (!activity) return null;
+            <div>
+              <h3>Beställningsöversikt</h3>
+              <div className="booking-summary">
+                {bookData
+                  .filter((book) => book.amount1 > 0 || book.amount2 > 0)
+                  .map((book) => {
+                    const activity = activities.find(
+                      (act) => act.id === book.activityId
+                    );
+                    if (!activity) return null;
 
-                  return (
-                    <div key={book.activityId} className="summary-item">
-                      <h3>{activity.title}</h3>
-                      {book.amount1 > 0 && (
-                        <div>
-                          <p>
-                            {book.amount1}x {activity.title} 1 timme:
-                          </p>
-                          <p>
-                            <strong>
-                              {book.amount1 * activity.cost},00 kr
-                            </strong>
-                          </p>
-                        </div>
-                      )}
-                      {book.amount2 > 0 && (
-                        <div>
-                          <p>
-                            {book.amount2}x {activity.title} 2 timmar:
-                          </p>
-                          <p>
-                            <strong>
-                              {book.amount2 * activity.cost * 2},00 kr
-                            </strong>
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              <p>
-                <strong>Totalt: {calculateTotal()},00 kr</strong>
-              </p>
+                    return (
+                      <div key={book.activityId} className="summary-item">
+                        <h3>{activity.title}</h3>
+                        {book.amount1 > 0 && (
+                          <div>
+                            <p>
+                              {book.amount1}x {activity.title} 1 timme:
+                            </p>
+                            <p>
+                              <strong>
+                                {book.amount1 * activity.cost},00 kr
+                              </strong>
+                            </p>
+                          </div>
+                        )}
+                        {book.amount2 > 0 && (
+                          <div>
+                            <p>
+                              {book.amount2}x {activity.title} 2 timmar:
+                            </p>
+                            <p>
+                              <strong>
+                                {book.amount2 * activity.cost * 2},00 kr
+                              </strong>
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                <p>
+                  <strong>Totalt: {calculateTotal()},00 kr</strong>
+                </p>
+              </div>
+
+              {bookData.filter((book) => book.amount1 > 0 || book.amount2 > 0)
+                .length === 0 && <p>Ingen aktivitet vald ännu.</p>}
             </div>
-
-            {bookData.filter((book) => book.amount1 > 0 || book.amount2 > 0)
-              .length === 0 && <p>Ingen aktivitet vald ännu.</p>}
+            <div className="time-div">
+              <div className="time-col">
+                <div className="time">
+                  <p>
+                    13:00 - 14:00&nbsp;&nbsp;&nbsp;
+                    <strong>Bowling - Bowlingbana</strong>
+                  </p>
+                </div>
+              </div>
+            </div>
 
             <div className="buttons">
               <button onClick={() => setpage(1)}>Tillbaka</button>

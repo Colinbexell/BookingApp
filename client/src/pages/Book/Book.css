@@ -57,11 +57,21 @@
   margin-top: 10vh;
 
   display: flex;
-  flex-direction: row;
-  align-items: start;
-  justify-content: center;
-  gap: 20px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: start;
   color: var(--text-dark);
+}
+
+.activities {
+  width: 100%;
+  height: auto;
+
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: start;
+  gap: 20px;
 }
 
 /* Välj tid */
@@ -87,8 +97,34 @@
   font-size: medium;
 }
 
+/* Tider */
+
+.time-col {
+  height: auto;
+  max-height: 80vh;
+
+  width: 60vw;
+  overflow-y: scroll;
+  scrollbar-width: none;
+  padding: 30px;
+  align-items: start;
+  justify-content: center;
+}
+
+.time {
+  box-shadow: 0 3px 10px 6px var(--shadow);
+  width: 90%;
+  height: 65px;
+  padding: 10px;
+  border-radius: var(--border-radius);
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 @media (max-width: 768px) {
-  .content {
+  .activities {
     flex-direction: column;
     align-items: center;
     justify-content: start;
