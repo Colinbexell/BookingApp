@@ -1,0 +1,44 @@
+.act_card {
+  height: 300px;
+  width: 250px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: start;
+  padding-top: 10px;
+  background-color: rgb(255, 255, 255);
+  box-shadow: 0 3px 10px 6px #00000029;
+  border-radius: var(--border-radius);
+  transition: all ease-in-out 0.2s;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.act_card:hover {
+  transform: scale(1.02);
+  border: solid 1px var(--primary);
+  box-shadow: 0 3px 10px 6px var(--primary-shadow);
+}
+
+.act_card:hover .info,
+.act_card:hover .amount,
+.act_card:hover .next {
+  display: flex;
+}
+
+.act_card img {
+  width: 90%;
+  border-radius: var(--border-radius-2);
+}
+
+.act_card h3 {
+  color: var(--text-dark);
+  font-weight: 600;
+  font-size: large;
+}
+
+.act_card p {
+  color: var(--text-dark);
+  font-weight: 600;
+  font-size: small;
+}

@@ -1,7 +1,6 @@
-import { useState, useContext, useEffect } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "react-hot-toast";
-import { UserContext } from "../../../context/userContext";
 import { useNavigate, Link } from "react-router-dom";
 import Loader from "../../components/loader/Loader";
 import "./Auth.css";
@@ -13,22 +12,22 @@ axios.defaults.withCredentials = true;
 const Login = () => {
   const [loginData, setloginData] = useState({ email: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
+  const [user, setuser] = useState(
+    JSON.parse(localStorage.getItem("userData"))
+  );
 
-  const { user, setUser, loading } = useContext(UserContext);
   const navigate = useNavigate();
 
   // Redirect if already logged in OBS change these based off user roles and routes
   useEffect(() => {
-    if (!loading && user) {
+    if (user) {
       if (user.role === "admin") {
         navigate("/admin");
-      } else if (user.role === "dev") {
-        navigate("/developer");
       } else {
         navigate("/");
       }
     }
-  }, [user, loading, navigate]);
+  }, [user, navigate]);
 
   const loginUser = async (e) => {
     e.preventDefault();
@@ -43,14 +42,14 @@ const Login = () => {
     setIsLoading(true);
 
     try {
-      const { data } = await axios.post("/api/login", { email, password });
+      const { data } = await axios.post("/user/login", { email, password });
 
       if (data.error) {
         toast.error(data.message);
       } else {
         toast.success(data.message);
         // Update the context with user data
-        setUser(data.user);
+        localStorage.setItem("userData", JSON.stringify(data.user));
 
         // Navigate based on role OBS change these based off of roles and routes
         if (data.role === "admin") {
@@ -75,15 +74,6 @@ const Login = () => {
       setIsLoading(false);
     }
   };
-
-  // Show loading while checking authentication
-  if (loading) {
-    return (
-      <div>
-        <Loader />
-      </div>
-    );
-  }
 
   return (
     <div className="main auth-container">

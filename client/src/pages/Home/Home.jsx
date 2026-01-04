@@ -6,6 +6,7 @@ import Navbar from "../../components/navbar/Navbar";
 import BowlingBG from "../../assets/BowlingBG.jpg";
 
 const Home = () => {
+  localStorage.clear();
   const mainRef = useRef(null);
   const s1 = useRef(null);
   const s2 = useRef(null);

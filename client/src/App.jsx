@@ -5,28 +5,18 @@ import ProtectedRoute from "./utils/ProtectedRoute";
 // Imported paths
 import Home from "./pages/Home/Home";
 import Book from "./pages/Book/Book";
-import Dev from "./pages/Dev/Dev";
 import Login from "./pages/Authentication/Login";
 import Register from "./pages/Authentication/Register";
-import Admin from "./pages/Admin";
-
-axios.defaults.baseURL = "http://localhost:6969";
-axios.defaults.withCredentials = true;
+import Admin from "./pages/Admin/Admin";
 
 function App() {
+  localStorage.setItem("selectedWorkshopId", "695aa0f8e844dfb53f509446");
   return (
     <>
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/book" element={<Book />} />
-        <Route
-          path="/developer"
-          element={
-            <ProtectedRoute roles={["dev"]}>
-              <Dev />
-            </ProtectedRoute>
-          }
-        />
+
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route

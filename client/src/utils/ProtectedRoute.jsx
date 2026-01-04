@@ -1,19 +1,11 @@
-import { useContext } from "react";
 import { Navigate } from "react-router-dom";
-import { UserContext } from "../../context/userContext";
 import Loader from "../components/loader/Loader";
+import { useState } from "react";
 
 const ProtectedRoute = ({ children, roles }) => {
-  const { user, loading } = useContext(UserContext);
-
-  // Loading state
-  if (loading) {
-    return (
-      <div>
-        <Loader />
-      </div>
-    );
-  }
+  const [user, setuser] = useState(
+    JSON.parse(localStorage.getItem("userData"))
+  );
 
   // Redirect if not logged in
   if (!user) {

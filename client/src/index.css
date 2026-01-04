@@ -110,6 +110,22 @@ body {
   z-index: 1;
 }
 
+.popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  overflow: hidden;
+  cursor: pointer;
+  backdrop-filter: blur(2px);
+}
+
 .section {
   width: 100%;
   min-height: 50vh;
@@ -140,7 +156,6 @@ input {
 }
 
 .normal-input {
-  width: 100%;
   padding: 10px;
   border: none;
   border-radius: 5px;
@@ -148,6 +163,9 @@ input {
   color: var(--text);
   font-size: 16px;
   margin-top: 1.5vh;
+  transition: all ease-in-out 0.1s;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  font-family: inherit;
 }
 
 .normal-input:focus {
@@ -188,6 +206,14 @@ a {
   text-decoration: inherit;
 }
 
+p,
+label,
+span,
+div,
+strong {
+  color: var(--text-dark);
+}
+
 h1 {
   font-size: 2.8em;
   line-height: 1.1;
@@ -195,7 +221,7 @@ h1 {
 }
 
 h2 {
-  font-size: 2.3em;
+  font-size: 2em;
   line-height: 1.1;
   color: var(--text-dark);
 }

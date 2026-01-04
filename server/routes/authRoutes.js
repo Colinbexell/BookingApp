@@ -4,12 +4,7 @@ const cors = require("cors");
 const rateLimit = require("express-rate-limit");
 
 // Importer routes controllers
-const {
-  registerUser,
-  loginUser,
-  getProfile,
-  logoutUser,
-} = require("../controllers/authController");
+const { registerUser, loginUser } = require("../controllers/authController");
 
 // CORS config, ändra origin till domänen vid produktion
 router.use(
@@ -33,11 +28,5 @@ router.post("/register", registerUser);
 
 // Login user route
 router.post("/login", loginLimiter, loginUser);
-
-// Login user route
-router.get("/profile", getProfile);
-
-// Logout user route
-router.post("/logout", logoutUser);
 
 module.exports = router;
