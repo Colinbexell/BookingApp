@@ -1,7 +1,8 @@
-@import url("https://fonts.googleapis.com/css2?family=Dosis:wght@200..800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Dosis:wght@200..800&family=TASA+Explorer:wght@400..800&display=swap");
 
 :root {
-  font-family: "Dosis", system-ui, -apple-system, sans-serif;
+  /* font-family: "Dosis", system-ui, -apple-system, sans-serif; */
+  font-family: "TASA Explorer", sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
@@ -21,7 +22,6 @@
   --primary: #2eeabb;
   --primary-shadow: #2eeabb53;
   --secondary: #27cca4;
-  --red: #ff5a5a;
   --background: #ebebebff;
   --background-secondary: #d9d9d9ff;
   --text-dark: #12151c;
@@ -32,6 +32,12 @@
   --border-radius: 10px;
   --border-radius-2: 6px;
 
+  --green-border: rgba(46, 234, 187, 0.55);
+  --green: rgba(46, 234, 187, 0.38);
+
+  --danger: #dc5353;
+  --red-border: rgba(255, 90, 90, 0.45);
+  --red: rgba(255, 90, 90, 0.14);
   --navbar: #161616c5;
 }
 

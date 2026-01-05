@@ -4,7 +4,6 @@ const cors = require("cors");
 
 const {
   createBooking,
-  listBookingsForActivity,
   listBookingsForWorkshop,
 } = require("../controllers/bookingController");
 
@@ -16,7 +15,6 @@ router.use(
 );
 
 router.post("/create", createBooking);
-router.get("/activity/:activityId", listBookingsForActivity);
 router.get("/workshop/:workshopId", listBookingsForWorkshop);
 
 module.exports = router;

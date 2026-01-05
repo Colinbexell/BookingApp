@@ -9,6 +9,9 @@ import { API_BASE_URL } from "../../../config";
 axios.defaults.baseURL = API_BASE_URL;
 axios.defaults.withCredentials = true;
 
+// --------------------
+// date helpers (Sweden local)
+// --------------------
 const pad2 = (n) => String(n).padStart(2, "0");
 const toISODate = (d) =>
   `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -29,12 +32,11 @@ const overlaps = (aStartISO, aSlots, bStartISO, bSlots, slotMinutes) => {
 };
 
 const Home = () => {
-  const [page, setpage] = useState(1);
+  const [page, setPage] = useState(1);
 
   const [selectedDate, setSelectedDate] = useState(() => toISODate(new Date()));
 
-  // workshopId måste komma från någon “tenant”-källa.
-  // Exempel: spara den när man väljer företag på startsidan
+  // tenant/workshop
   const [workshopId] = useState(() => {
     try {
       return localStorage.getItem("selectedWorkshopId") || "";
@@ -43,12 +45,20 @@ const Home = () => {
     }
   });
 
-  // activities från API
+  // customer info (page 3)
+  const [customerName, setCustomerName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+
+  // payment (page 4)
+  const [paymentMethod, setPaymentMethod] = useState("onsite"); // onsite | online
+
+  // activities from API
   const [activities, setActivities] = useState([]);
   const [loadingActs, setLoadingActs] = useState(false);
 
   // cart: { activityId, amount1, amount2, selections: [{startISO, durationSlots}] }
-  const [bookData, setbookData] = useState(() => {
+  const [bookData, setBookData] = useState(() => {
     try {
       const saved = localStorage.getItem("bookData");
       const parsed = saved ? JSON.parse(saved) : [];
@@ -62,9 +72,9 @@ const Home = () => {
     localStorage.setItem("bookData", JSON.stringify(bookData));
   }, [bookData]);
 
-  // -----------------------------------
+  // --------------------
   // Load activities
-  // -----------------------------------
+  // --------------------
   const loadActivities = async () => {
     if (!workshopId) {
       setActivities([]);
@@ -77,17 +87,22 @@ const Home = () => {
       const res = await axios.get(`/activity?workshopId=${workshopId}`);
 
       const mapped = (res.data.activities || []).map((a) => ({
-        id: a.id,
+        id: String(a.id || a._id),
         title: a.title,
         info: a.information,
         img: a.imageUrl,
         tracks: a.tracks,
-        bookingRules: a.bookingRules,
-        pricePerSlot: a.pricePerSlot || 0,
+        bookingRules: a.bookingRules || {
+          slotMinutes: 60,
+          minSlots: 1,
+          maxSlots: 2,
+        },
+        // Om du inte har pricing i backend ännu: håll 0 så länge
+        pricePerSlot: Number(a.pricePerSlot || 0),
       }));
 
       setActivities(mapped);
-    } catch (e) {
+    } catch {
       toast.error("Kunde inte hämta aktiviteter");
       setActivities([]);
     } finally {
@@ -97,11 +112,12 @@ const Home = () => {
 
   useEffect(() => {
     loadActivities();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workshopId]);
 
-  // -----------------------------------
-  // Cart helpers (din gamla logik + selections)
-  // -----------------------------------
+  // --------------------
+  // Cart helpers
+  // --------------------
   const updateBookData = (field, value, activityId) => {
     const existingIndex = bookData.findIndex(
       (b) => b.activityId === activityId
@@ -117,14 +133,14 @@ const Home = () => {
       nextObj.selections = (nextObj.selections || []).slice(0, need);
 
       if ((nextObj.amount1 || 0) === 0 && (nextObj.amount2 || 0) === 0) {
-        setbookData(updated.filter((_, idx) => idx !== existingIndex));
+        setBookData(updated.filter((_, idx) => idx !== existingIndex));
       } else {
         updated[existingIndex] = nextObj;
-        setbookData(updated);
+        setBookData(updated);
       }
     } else {
       if (value > 0) {
-        setbookData([
+        setBookData([
           ...bookData,
           {
             activityId,
@@ -148,22 +164,17 @@ const Home = () => {
     );
   };
 
-  const nextPage = () => {
-    if (page === 1) {
-      if (bookData.length !== 0) setpage(2);
-      return;
-    }
+  const neededCounts = (booking) => {
+    const need1 = booking.amount1 || 0;
+    const need2 = booking.amount2 || 0;
+    return { need1, need2, needTotal: need1 + need2 };
+  };
 
-    if (page === 2) {
-      const allOk = bookData.every((b) => {
-        const need = (b.amount1 || 0) + (b.amount2 || 0);
-        return (b.selections || []).length === need;
-      });
-
-      if (bookData.length !== 0 && allOk) setpage(3);
-      else toast.error("Välj alla tider innan du går vidare");
-      return;
-    }
+  const selectedCounts = (booking) => {
+    const selections = booking.selections || [];
+    const sel1 = selections.filter((s) => s.durationSlots === 1).length;
+    const sel2 = selections.filter((s) => s.durationSlots === 2).length;
+    return { sel1, sel2, selTotal: selections.length };
   };
 
   const calculateTotal = () => {
@@ -180,10 +191,10 @@ const Home = () => {
     }, 0);
   };
 
-  // -----------------------------------
-  // Availability (API) för valt datum
-  // -----------------------------------
-  const [availabilityMap, setAvailabilityMap] = useState({}); // activityId -> {slotMinutes, slots[]}
+  // --------------------
+  // Availability (API)
+  // --------------------
+  const [availabilityMap, setAvailabilityMap] = useState({});
   const [loadingAvail, setLoadingAvail] = useState(false);
 
   const loadAvailabilityForSelected = async () => {
@@ -201,7 +212,7 @@ const Home = () => {
       setLoadingAvail(true);
 
       const from = selectedDate;
-      const to = addDaysISO(selectedDate, 1);
+      const to = addDaysISO(selectedDate, 1); // exclusive day after
 
       const results = await Promise.all(
         uniqueIds.map(async (id) => {
@@ -213,11 +224,9 @@ const Home = () => {
       );
 
       const next = {};
-      for (const [id, data] of results) {
-        next[id] = data;
-      }
+      for (const [id, data] of results) next[id] = data;
       setAvailabilityMap(next);
-    } catch (e) {
+    } catch {
       toast.error("Kunde inte hämta lediga tider");
       setAvailabilityMap({});
     } finally {
@@ -235,11 +244,12 @@ const Home = () => {
 
   useEffect(() => {
     if (page === 2) loadAvailabilityForSelected();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, selectedDate, selectedActivityIdsKey]);
 
-  // -----------------------------------
-  // Picking slots (frontend-logik baserat på availableTracks)
-  // -----------------------------------
+  // --------------------
+  // Picking slots
+  // --------------------
   const takenCountInCartForSlot = (activityId, startISO, slotMinutes) => {
     const cart = getActivityBookData(activityId);
     const selections = cart.selections || [];
@@ -277,34 +287,35 @@ const Home = () => {
 
       if (effectiveAvailable <= 0) return false;
     }
-
     return true;
   };
 
   const pickTime = (activityId, startISO, durationSlots) => {
-    setbookData((prev) =>
+    const av = availabilityMap[activityId];
+    const slots = av?.slots || [];
+
+    // hitta index för slotten så canPickStart kan kolla "i rad"
+    const idx = slots.findIndex((s) => s.startISO === startISO);
+    if (idx === -1) return;
+
+    // server+cart capacity check
+    if (!canPickStart(activityId, idx, durationSlots)) {
+      toast.error("Den tiden har inte tillräcklig kapacitet kvar.");
+      return;
+    }
+
+    setBookData((prev) =>
       prev.map((b) => {
         if (b.activityId !== activityId) return b;
-
-        const av = availabilityMap[activityId];
-        const slotMinutes = av?.slotMinutes || 60;
 
         const need = (b.amount1 || 0) + (b.amount2 || 0);
         const selections = b.selections || [];
 
+        // stoppa om man redan valt allt man behöver
         if (selections.length >= need) return b;
 
-        const overlapsExisting = selections.some((sel) =>
-          overlaps(
-            sel.startISO,
-            sel.durationSlots,
-            startISO,
-            durationSlots,
-            slotMinutes
-          )
-        );
-        if (overlapsExisting) return b;
-
+        // Tillåt samma startISO flera gånger (för flera banor),
+        // men vi litar på canPickStart så att capacity inte överskrids.
         return {
           ...b,
           selections: [...selections, { startISO, durationSlots }],
@@ -314,7 +325,7 @@ const Home = () => {
   };
 
   const removeSelection = (activityId, index) => {
-    setbookData((prev) =>
+    setBookData((prev) =>
       prev.map((b) =>
         b.activityId === activityId
           ? {
@@ -326,33 +337,61 @@ const Home = () => {
     );
   };
 
-  const neededCounts = (booking) => {
-    const need1 = booking.amount1 || 0;
-    const need2 = booking.amount2 || 0;
-    return { need1, need2, needTotal: need1 + need2 };
+  // --------------------
+  // Navigation validation
+  // --------------------
+  const canGoNextFromTimes = useMemo(() => {
+    if (bookData.length === 0) return false;
+    return bookData.every((b) => {
+      const need = (b.amount1 || 0) + (b.amount2 || 0);
+      return (b.selections || []).length === need;
+    });
+  }, [bookData]);
+
+  const nextPage = () => {
+    if (page === 1) {
+      if (bookData.length !== 0) setPage(2);
+      return;
+    }
+
+    if (page === 2) {
+      if (bookData.length !== 0 && canGoNextFromTimes) setPage(3);
+      else toast.error("Välj alla tider innan du går vidare");
+      return;
+    }
+
+    if (page === 3) {
+      if (!customerName.trim() || !email.trim() || !phone.trim()) {
+        toast.error("Fyll i namn, mail och telefon");
+        return;
+      }
+      setPage(4);
+    }
   };
 
-  const selectedCounts = (booking) => {
-    const selections = booking.selections || [];
-    const sel1 = selections.filter((s) => s.durationSlots === 1).length;
-    const sel2 = selections.filter((s) => s.durationSlots === 2).length;
-    return { sel1, sel2, selTotal: selections.length };
-  };
-
-  // -----------------------------------
-  // FINAL: skapa bokningar i backend
-  // -----------------------------------
+  // --------------------
+  // Submit bookings
+  // --------------------
   const [submittingBooking, setSubmittingBooking] = useState(false);
 
   const submitBookings = async () => {
     try {
       setSubmittingBooking(true);
 
+      if (!customerName.trim() || !email.trim() || !phone.trim()) {
+        toast.error("Fyll i namn, mail och telefon");
+        return;
+      }
+
       const payload = bookData.flatMap((b) =>
         (b.selections || []).map((sel) => ({
           activityId: b.activityId,
           startISO: sel.startISO,
           durationSlots: sel.durationSlots,
+          customerName,
+          email,
+          phone,
+          paymentMethod, // onsite | online
         }))
       );
 
@@ -364,30 +403,51 @@ const Home = () => {
       const results = await Promise.allSettled(
         payload.map((p) => axios.post("/booking/create", p))
       );
-
       const failed = results.filter((r) => r.status === "rejected");
+
       if (failed.length > 0) {
-        toast.error(
-          "Minst en bokning misslyckades (någon hann boka före). Uppdatera tider."
-        );
-        await loadAvailabilityForSelected();
+        const err = failed[0].reason;
+        const status = err?.response?.status;
+        const msg =
+          err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          "Bokning misslyckades";
+
+        if (status === 409) {
+          toast.error(
+            "Minst en bokning misslyckades (någon hann boka före). Uppdatera tider."
+          );
+          await loadAvailabilityForSelected();
+          return;
+        }
+
+        if (status === 400) {
+          toast.error(msg);
+          return;
+        }
+
+        toast.error(msg);
         return;
       }
 
-      toast.success("Bokning klar");
+      toast.success("Bokning klar 🎉");
       localStorage.removeItem("bookData");
-      setbookData([]);
-      setpage(1);
-    } catch (e) {
+      setBookData([]);
+      setCustomerName("");
+      setEmail("");
+      setPhone("");
+      setPaymentMethod("onsite");
+      setPage(1);
+    } catch {
       toast.error("Kunde inte slutföra bokning");
     } finally {
       setSubmittingBooking(false);
     }
   };
 
-  // -----------------------------------
+  // --------------------
   // UI
-  // -----------------------------------
+  // --------------------
   const renderPage = () => {
     switch (page) {
       case 1:
@@ -420,13 +480,6 @@ const Home = () => {
           (b) => (b.amount1 || 0) > 0 || (b.amount2 || 0) > 0
         );
 
-        const canGoNext =
-          bookData.length !== 0 &&
-          bookData.every((b) => {
-            const need = (b.amount1 || 0) + (b.amount2 || 0);
-            return (b.selections || []).length === need;
-          });
-
         return (
           <div className="content booking-page">
             <div className="booking-header">
@@ -447,17 +500,18 @@ const Home = () => {
                   </button>
                 </div>
               </div>
+
               <div>
                 <h1 className="booking-title">Välj tid</h1>
                 <p className="booking-subtitle">
-                  Välj tider för de aktiviteter du har lagt i din bokning. Varje
-                  “slot” är en tid du kan boka. 2 timmar kräver två slots i rad.
+                  Välj tider för de aktiviteter du lagt i din bokning. 2h kräver
+                  två tider i rad.
                 </p>
               </div>
             </div>
 
             <div className="booking-grid">
-              {/* LEFT: välj tider */}
+              {/* LEFT */}
               <div className="panel">
                 <div className="panel-header">
                   <h2 className="panel-title">Lediga tider</h2>
@@ -480,16 +534,16 @@ const Home = () => {
 
                 <div className="helper-card">
                   <div className="helper-row">
-                    <div className="helper-title">Vad betyder “tracks”?</div>
+                    <div className="helper-title">Tracks</div>
                     <div className="helper-text">
-                      Tracks är hur många som kan boka samma slot samtidigt
+                      Tracks = hur många som kan boka samma slot samtidigt
                       (t.ex. antal banor).
                     </div>
                   </div>
                   <div className="helper-row">
-                    <div className="helper-title">Vad betyder 1h / 2h?</div>
+                    <div className="helper-title">1h / 2h</div>
                     <div className="helper-text">
-                      1h = en slot. 2h = två slots i rad (t.ex. 14:00 + 15:00).
+                      1h = en slot. 2h = två slots i rad.
                     </div>
                   </div>
                 </div>
@@ -620,16 +674,18 @@ const Home = () => {
                 )}
               </div>
 
-              {/* RIGHT: sammanfattning */}
+              {/* RIGHT */}
               <div className="panel panel-sticky">
                 <div className="panel-header">
                   <h2 className="panel-title">Din bokning</h2>
                   <div
                     className={`status ${
-                      canGoNext ? "status-ok" : "status-warn"
+                      canGoNextFromTimes ? "status-ok" : "status-warn"
                     }`}
                   >
-                    {canGoNext ? "Redo att gå vidare" : "Välj alla tider"}
+                    {canGoNextFromTimes
+                      ? "Redo att gå vidare"
+                      : "Välj alla tider"}
                   </div>
                 </div>
 
@@ -717,20 +773,20 @@ const Home = () => {
                   <div className="actions">
                     <button
                       className="btn btn-ghost"
-                      onClick={() => setpage(1)}
+                      onClick={() => setPage(1)}
                     >
                       Tillbaka
                     </button>
                     <button
                       className="btn"
                       onClick={nextPage}
-                      disabled={!canGoNext}
+                      disabled={!canGoNextFromTimes}
                     >
                       Nästa
                     </button>
                   </div>
 
-                  {!canGoNext && (
+                  {!canGoNextFromTimes && (
                     <div className="hint">
                       Tips: du måste välja exakt lika många tider som du valt
                       antal 1h/2h för varje aktivitet.
@@ -743,38 +799,199 @@ const Home = () => {
         );
       }
 
+      // ✅ NY: Page 3 använder “pro”-layouten från Book.css
       case 3:
         return (
-          <div className="content">
-            <h2>Slutför bokning</h2>
-            <p style={{ opacity: 0.8 }}>
-              Nu skickas bokningarna till backend. Om någon slot hinner bli full
-              så får du fel och kan uppdatera tider.
-            </p>
+          <div className="content booking-page">
+            <div className="booking-header">
+              <div>
+                <h1 className="booking-title">Ange uppgifter</h1>
+                <p className="booking-subtitle">
+                  Fyll i kontaktuppgifter så personalen kan hitta din bokning
+                  snabbt.
+                </p>
+              </div>
+            </div>
 
-            <pre style={{ width: "80vw", overflow: "auto" }}>
-              {JSON.stringify(
-                {
-                  date: selectedDate,
-                  bookings: bookData.flatMap((b) =>
-                    (b.selections || []).map((sel) => ({
-                      activityId: b.activityId,
-                      startISO: sel.startISO,
-                      durationSlots: sel.durationSlots,
-                    }))
-                  ),
-                  total: calculateTotal(),
-                },
-                null,
-                2
-              )}
-            </pre>
+            <div className="booking-grid booking-grid-single">
+              <div className="panel">
+                <div className="panel-header">
+                  <h2 className="panel-title">Kontakt</h2>
+                </div>
 
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setpage(2)}>Tillbaka</button>
-              <button onClick={submitBookings} disabled={submittingBooking}>
-                {submittingBooking ? "Skickar..." : "Bekräfta & boka"}
-              </button>
+                <div className="form-grid">
+                  <div className="field">
+                    <label>Namn</label>
+                    <input
+                      className="text-input"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Förnamn Efternamn"
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>Mail</label>
+                    <input
+                      className="text-input"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="namn@mail.com"
+                    />
+                  </div>
+
+                  <div className="field">
+                    <label>Telefon</label>
+                    <input
+                      className="text-input"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      placeholder="070-123 45 67"
+                    />
+                  </div>
+
+                  <div className="actions">
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => setPage(2)}
+                    >
+                      Tillbaka
+                    </button>
+                    <button className="btn" onClick={nextPage}>
+                      Nästa
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel panel-soft">
+                <div className="panel-header">
+                  <h2 className="panel-title">Snabb översikt</h2>
+                </div>
+
+                <div className="mini-summary">
+                  <div>
+                    <div className="muted">Datum</div>
+                    <strong>{selectedDate}</strong>
+                  </div>
+                  <div>
+                    <div className="muted">Totalt</div>
+                    <strong>{calculateTotal()},00 kr</strong>
+                  </div>
+                </div>
+
+                <div className="hint" style={{ marginTop: 12 }}>
+                  Tips: samma namn + tid räcker vid kassan — personalen hittar
+                  dig direkt.
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      // ✅ NY: Page 4 använder “payment”-klasserna från Book.css
+      case 4:
+        return (
+          <div className="content booking-page">
+            <div className="booking-header">
+              <div>
+                <h1 className="booking-title">Betalning</h1>
+                <p className="booking-subtitle">
+                  Välj om du vill betala på plats (obetald) eller direkt
+                  (betald).
+                </p>
+              </div>
+            </div>
+
+            <div className="booking-grid booking-grid-single">
+              <div className="panel">
+                <div className="panel-header">
+                  <h2 className="panel-title">Betalsätt</h2>
+                </div>
+
+                <div className="payment-grid">
+                  <button
+                    className={`pay-option ${
+                      paymentMethod === "onsite" ? "active" : ""
+                    }`}
+                    onClick={() => setPaymentMethod("onsite")}
+                    type="button"
+                  >
+                    <div className="pay-title">Betala på plats</div>
+                    <div className="pay-desc muted">
+                      Markeras som <strong>Obetald</strong> i admin tills
+                      personalen tar betalt.
+                    </div>
+                  </button>
+
+                  <button
+                    className={`pay-option ${
+                      paymentMethod === "online" ? "active" : ""
+                    }`}
+                    onClick={() => setPaymentMethod("online")}
+                    type="button"
+                  >
+                    <div className="pay-title">Betala direkt</div>
+                    <div className="pay-desc muted">
+                      Markeras som <strong>Betald</strong>. (Koppla Stripe
+                      senare.)
+                    </div>
+                  </button>
+                </div>
+
+                <div className="summary-footer">
+                  <div className="total-row">
+                    <span className="muted">Totalt</span>
+                    <strong>{calculateTotal()},00 kr</strong>
+                  </div>
+
+                  <div className="actions">
+                    <button
+                      className="btn btn-ghost"
+                      onClick={() => setPage(3)}
+                    >
+                      Tillbaka
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={submitBookings}
+                      disabled={submittingBooking}
+                    >
+                      {submittingBooking ? "Skickar..." : "Bekräfta & boka"}
+                    </button>
+                  </div>
+
+                  <div className="hint">
+                    Du får en bokningsbekräftelse i systemet efter att bokningen
+                    gått igenom.
+                  </div>
+                </div>
+              </div>
+
+              <div className="panel panel-soft">
+                <div className="panel-header">
+                  <h2 className="panel-title">Kontakt & datum</h2>
+                </div>
+
+                <div className="mini-summary">
+                  <div>
+                    <div className="muted">Namn</div>
+                    <strong>{customerName || "-"}</strong>
+                  </div>
+                  <div>
+                    <div className="muted">Mail</div>
+                    <strong>{email || "-"}</strong>
+                  </div>
+                  <div>
+                    <div className="muted">Telefon</div>
+                    <strong>{phone || "-"}</strong>
+                  </div>
+                  <div>
+                    <div className="muted">Datum</div>
+                    <strong>{selectedDate}</strong>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -794,16 +1011,19 @@ const Home = () => {
             Välj aktivitet
           </p>
         </div>
+
         <div className={page === 2 ? "progress_ball_active" : "progress_ball"}>
           <p className={page === 2 ? "progress_txt_active" : "progress_txt"}>
             Välj tid
           </p>
         </div>
+
         <div className={page === 3 ? "progress_ball_active" : "progress_ball"}>
           <p className={page === 3 ? "progress_txt_active" : "progress_txt"}>
             Ange info
           </p>
         </div>
+
         <div className={page === 4 ? "progress_ball_active" : "progress_ball"}>
           <p className={page === 4 ? "progress_txt_active" : "progress_txt"}>
             Slutför

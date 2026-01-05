@@ -73,13 +73,42 @@ const Admin = () => {
   };
 
   // --- Load bookings (workshop) ---
+  const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
   const loadBookings = async () => {
     if (!workshopId) return;
+
     try {
       const res = await axios.get(
         `/booking/workshop/${workshopId}?from=${fromDate}&to=${toDate}`
       );
-      setBookings(res.data.bookings || []);
+
+      const normalized = (res.data.bookings || []).map((b) => {
+        return {
+          id: b._id,
+          customerName: b.customerName || "Okänt namn",
+
+          // 🔥 AKTIVITET
+          activityTitle:
+            b.activityTitle || b.activity?.title || "Okänd aktivitet",
+
+          // ⏰ TID
+          startAt: b.startAt,
+          endAt: b.endAt,
+
+          // 🎳 ANTAL BANOR
+          quantity: b.quantity || 1,
+
+          // 💳 BETALNING
+          paymentStatus: b.paymentStatus || "unpaid", // paid | unpaid
+          paymentMethod: b.paymentMethod || "onsite", // online | onsite
+
+          // 📌 STATUS
+          status: b.status || "active",
+        };
+      });
+
+      setBookings(normalized);
     } catch {
       toast.error("Kunde inte hämta bokningar");
     }
@@ -217,9 +246,6 @@ const Admin = () => {
             <div className="bookings-head">
               <div>
                 <h3 style={{ margin: 0 }}>Bokningar</h3>
-                <p className="admin-muted" style={{ margin: "6px 0 0 0" }}>
-                  Kunden säger namn + tid. Matcha snabbt i listan.
-                </p>
               </div>
 
               <div className="bookings-controls">
@@ -244,6 +270,8 @@ const Admin = () => {
                 <div>Namn</div>
                 <div>Aktivitet</div>
                 <div>Tid</div>
+                <div>Banor</div>
+                <div>Betalning</div>
                 <div>Status</div>
               </div>
 
@@ -253,32 +281,61 @@ const Admin = () => {
                 </div>
               ) : (
                 bookings.map((b) => {
-                  const start = new Date(b.startAt).toLocaleString("sv-SE", {
-                    weekday: "short",
-                    day: "2-digit",
-                    month: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
+                  const start = capitalize(
+                    new Date(b.startAt).toLocaleString("sv-SE", {
+                      weekday: "short",
+                      day: "2-digit",
+                      month: "2-digit",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })
+                  );
 
                   const end = new Date(b.endAt).toLocaleTimeString("sv-SE", {
                     hour: "2-digit",
                     minute: "2-digit",
                   });
 
+                  const paymentLabel =
+                    b.paymentStatus === "paid"
+                      ? "Betald"
+                      : b.paymentMethod === "onsite"
+                      ? "Obetald (på plats)"
+                      : "Obetald";
+
                   return (
                     <div key={b.id} className="bookings-row">
-                      <div className="booking-name">
+                      {/* 👤 Namn */}
+                      <div>
                         <strong>{b.customerName}</strong>
                       </div>
 
-                      <div className="booking-activity">{b.activityTitle}</div>
+                      {/* 🎯 Aktivitet */}
+                      <div>{b.activityTitle}</div>
 
+                      {/* ⏰ Tid */}
                       <div className="booking-time">
                         <strong>{start}</strong>
-                        <span className="muted">– {end}</span>
+                        <span className="muted"> – {end}</span>
                       </div>
 
+                      {/* 🎳 Banor */}
+                      <div>
+                        <span className="badge">{b.quantity} st</span>
+                      </div>
+
+                      {/* 💳 Betalning */}
+                      <div>
+                        <span
+                          className={`status-pill ${
+                            b.paymentStatus === "paid" ? "paid" : "unpaid"
+                          }`}
+                        >
+                          {paymentLabel}
+                        </span>
+                      </div>
+
+                      {/* 📌 Status */}
                       <div>
                         <span
                           className={`status-pill ${

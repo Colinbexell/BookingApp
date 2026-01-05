@@ -252,7 +252,11 @@
 
 .booking-page {
   width: 100%;
+  height: 100%;
   padding: 20px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .booking-header {
@@ -620,14 +624,110 @@
   line-height: 1.4;
 }
 
-@media (max-width: 1100px) {
-  .booking-grid {
-    grid-template-columns: 1fr;
-  }
-  .panel-sticky {
-    position: static;
-  }
-  .slots-grid {
-    grid-template-columns: repeat(2, minmax(160px, 1fr));
-  }
+/* Ange info sektion */
+
+.booking-grid-single {
+  grid-template-columns: 1fr 0.7fr;
+}
+
+.form-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-weight: 800;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.text-input {
+  height: 44px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: white;
+  color: var(--text-dark);
+}
+
+.text-input:focus {
+  outline: none;
+  border: 2px solid var(--primary);
+}
+
+.form-error {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(220, 0, 0, 0.08);
+  border: 1px solid rgba(220, 0, 0, 0.15);
+  font-weight: 800;
+}
+
+.form-ok {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(0, 170, 0, 0.1);
+  border: 1px solid rgba(0, 170, 0, 0.18);
+  font-weight: 800;
+}
+
+.panel-soft {
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.payment-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.pay-option {
+  text-align: left;
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.pay-option:hover {
+  transform: scale(1.01);
+}
+
+.pay-option.active {
+  border: 2px solid var(--primary);
+  box-shadow: 0 10px 30px var(--green);
+  background: rgba(46, 234, 187, 0.08);
+}
+
+.pay-title {
+  font-weight: 900;
+  font-size: 16px;
+}
+
+.pay-desc {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.mini-summary {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.mini-summary > div {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
