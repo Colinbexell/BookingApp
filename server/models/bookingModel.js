@@ -46,6 +46,10 @@ const bookingSchema = new Schema(
       enum: ["onsite", "online"],
       required: true, // onsite = betala på plats, online = betala direkt
     },
+
+    currency: { type: String, default: "SEK" },
+    unitPrices: { type: [Number], default: [] }, // pris per slot i bokningen
+    totalPrice: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

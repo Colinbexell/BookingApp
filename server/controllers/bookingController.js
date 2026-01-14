@@ -12,6 +12,49 @@ const makeLocalDate = (dateISO, hhmm) => {
   return new Date(y, mo - 1, da, h, m, 0, 0);
 };
 
+const pad2 = (n) => String(n).padStart(2, "0");
+const toISODate = (d) =>
+  `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+
+const hhmmToMinutes = (hhmm) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
+
+const getPriceForSlot = ({ pricingRules, dateISO, startHHMM }) => {
+  const fallback = pricingRules?.defaultPricePerHour ?? 0;
+
+  const ex = (pricingRules?.exceptions || []).find((e) => e.date === dateISO);
+  if (ex?.closed)
+    return { pricePerHour: 0, currency: pricingRules?.currency || "SEK" };
+
+  const ranges = ex?.ranges?.length
+    ? ex.ranges
+    : (() => {
+        const weekday = makeLocalDate(dateISO, "00:00").getDay();
+        const w = (pricingRules?.weekly || []).find((x) => x.day === weekday);
+        return w?.ranges || [];
+      })();
+
+  const t = hhmmToMinutes(startHHMM);
+
+  for (const r of ranges) {
+    const a = hhmmToMinutes(r.start);
+    const b = hhmmToMinutes(r.end);
+    if (a <= t && t < b) {
+      return {
+        pricePerHour: Number(r.pricePerHour),
+        currency: pricingRules?.currency || "SEK",
+      };
+    }
+  }
+
+  return {
+    pricePerHour: Number(fallback),
+    currency: pricingRules?.currency || "SEK",
+  };
+};
+
 /**
  * POST /booking/create
  * Body: { activityId, startISO, durationSlots, customerName, email, phone, paymentMethod }
@@ -53,7 +96,7 @@ const createBooking = async (req, res) => {
         .json({ message: "paymentMethod must be onsite|online" });
 
     const act = await Activity.findById(activityId).select(
-      "workshopId bookingRules"
+      "workshopId bookingRules pricingRules"
     );
     if (!act) return res.status(400).json({ message: "Invalid activityId" });
 
@@ -68,6 +111,32 @@ const createBooking = async (req, res) => {
 
     const endAt = new Date(startAt.getTime() + slots * slotMinutes * 60_000);
 
+    const currency = act.pricingRules?.currency || "SEK";
+    const unitPrices = [];
+
+    for (let i = 0; i < slots; i++) {
+      const slotStart = new Date(startAt.getTime() + i * slotMinutes * 60_000);
+      const dateISO = toISODate(slotStart);
+
+      const startHHMM = slotStart.toLocaleTimeString("sv-SE", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+
+      const { pricePerHour } = getPriceForSlot({
+        pricingRules: act.pricingRules,
+        dateISO,
+        startHHMM,
+      });
+
+      const slotPrice =
+        Math.round(pricePerHour * (slotMinutes / 60) * 100) / 100;
+      unitPrices.push(slotPrice);
+    }
+
+    const totalPrice =
+      Math.round(unitPrices.reduce((a, b) => a + b, 0) * 100) / 100;
+
     // TODO: här kan du stoppa in din “capacity check” (tracks) om du vill låsa på serversidan
     // Just nu: vi skapar bokningen rakt av.
 
@@ -75,9 +144,9 @@ const createBooking = async (req, res) => {
       workshopId: act.workshopId,
       activityId: act._id,
 
-      customerName,
-      email,
-      phone,
+      customerName: customerName.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
 
       startAt,
       endAt,
@@ -85,6 +154,10 @@ const createBooking = async (req, res) => {
 
       paymentMethod,
       paymentStatus: paymentMethod === "online" ? "paid" : "unpaid",
+
+      currency,
+      unitPrices,
+      totalPrice,
     });
 
     return res.status(201).json({ ok: true, booking: doc });
@@ -134,24 +207,44 @@ const listBookingsForWorkshop = async (req, res) => {
       },
       { $unwind: { path: "$activity", preserveNullAndEmptyArrays: true } },
 
+      {
+        $addFields: {
+          customerNameNorm: { $trim: { input: "$customerName" } },
+          emailNorm: { $toLower: { $trim: { input: "$email" } } },
+          phoneNorm: { $trim: { input: "$phone" } },
+
+          // gör att tider matchar även om ms skiljer
+          startAtNorm: { $dateTrunc: { date: "$startAt", unit: "minute" } },
+          endAtNorm: { $dateTrunc: { date: "$endAt", unit: "minute" } },
+        },
+      },
       // group "identiska" bokningar till en rad med quantity
       {
         $group: {
           _id: {
-            customerName: "$customerName",
-            email: "$email",
-            phone: "$phone",
+            customerName: "$customerNameNorm",
+            email: "$emailNorm",
+            phone: "$phoneNorm",
+
             activityId: "$activityId",
             activityTitle: "$activity.title",
-            startAt: "$startAt",
-            endAt: "$endAt",
+
+            startAt: "$startAtNorm",
+            endAt: "$endAtNorm",
+
             durationSlots: "$durationSlots",
             paymentStatus: "$paymentStatus",
             paymentMethod: "$paymentMethod",
             status: "$status",
           },
+
           quantity: { $sum: 1 },
           createdAtMin: { $min: "$createdAt" },
+
+          totalPriceSum: { $sum: "$totalPrice" },
+          currencyFirst: { $first: "$currency" },
+
+          bookingIds: { $push: "$_id" },
         },
       },
 
@@ -178,8 +271,12 @@ const listBookingsForWorkshop = async (req, res) => {
           durationSlots: "$_id.durationSlots",
           paymentStatus: "$_id.paymentStatus",
           paymentMethod: "$_id.paymentMethod",
+          totalPrice: "$totalPriceSum",
+          currency: "$currencyFirst",
           status: "$_id.status",
           quantity: 1,
+
+          bookingIds: 1,
         },
       },
 
@@ -192,7 +289,29 @@ const listBookingsForWorkshop = async (req, res) => {
   }
 };
 
+const cancelBookings = async (req, res) => {
+  try {
+    const { bookingIds } = req.body;
+
+    if (!Array.isArray(bookingIds) || bookingIds.length === 0) {
+      return res.status(400).json({ ok: false, message: "bookingIds krävs" });
+    }
+
+    const ids = bookingIds.map((id) => new mongoose.Types.ObjectId(id));
+
+    const result = await Booking.updateMany(
+      { _id: { $in: ids } },
+      { $set: { status: "cancelled" } }
+    );
+
+    return res.json({ ok: true, modified: result.modifiedCount });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+};
+
 module.exports = {
   createBooking,
   listBookingsForWorkshop,
+  cancelBookings,
 };

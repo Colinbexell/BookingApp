@@ -27,8 +27,11 @@
 }
 
 .act_card img {
+  height: 60%;
   width: 90%;
+  object-fit: cover; /* beskär istället för att stretcha */
   border-radius: var(--border-radius-2);
+  display: block;
 }
 
 .act_card h3 {

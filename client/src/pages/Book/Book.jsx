@@ -177,16 +177,39 @@ const Home = () => {
     return { sel1, sel2, selTotal: selections.length };
   };
 
+  const calcSelectionPrice = (activityId, startISO, durationSlots) => {
+    const av = availabilityMap[activityId];
+    const slots = av?.slots || [];
+    if (!slots.length) return 0;
+
+    const idx = slots.findIndex((s) => s.startISO === startISO);
+    if (idx === -1) return 0;
+
+    let sum = 0;
+    for (let i = 0; i < durationSlots; i++) {
+      const s = slots[idx + i];
+      if (!s) return 0;
+      sum += Number(s.slotPrice || 0);
+    }
+
+    // snygg avrundning
+    return Math.round(sum * 100) / 100;
+  };
+
   const calculateTotal = () => {
     return bookData.reduce((total, booking) => {
-      const activity = activities.find((act) => act.id === booking.activityId);
-      if (!activity) return total;
-
       const selections = booking.selections || [];
-      const sum = selections.reduce(
-        (acc, sel) => acc + sel.durationSlots * (activity.pricePerSlot || 0),
-        0
-      );
+      const sum = selections.reduce((acc, sel) => {
+        return (
+          acc +
+          calcSelectionPrice(
+            booking.activityId,
+            sel.startISO,
+            sel.durationSlots
+          )
+        );
+      }, 0);
+
       return total + sum;
     }, 0);
   };
@@ -246,6 +269,53 @@ const Home = () => {
     if (page === 2) loadAvailabilityForSelected();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, selectedDate, selectedActivityIdsKey]);
+
+  const getCoveredStartISOs = (activityId) => {
+    const b = getActivityBookData(activityId);
+    const av = availabilityMap[activityId];
+    const slots = av?.slots || [];
+    if (!slots.length) return new Set();
+
+    const indexByStart = new Map(slots.map((s, i) => [s.startISO, i]));
+    const covered = new Set();
+
+    for (const sel of b.selections || []) {
+      const startIdx = indexByStart.get(sel.startISO);
+      if (startIdx === undefined) continue;
+
+      for (let i = 0; i < (sel.durationSlots || 1); i++) {
+        const s = slots[startIdx + i];
+        if (s) covered.add(s.startISO);
+      }
+    }
+
+    return covered;
+  };
+
+  // visar om slotten är start på en 2h-block (för “leading” highlight)
+  const isTwoHourStart = (activityId, startISO) => {
+    const b = getActivityBookData(activityId);
+    return (b.selections || []).some(
+      (sel) => sel.startISO === startISO && sel.durationSlots === 2
+    );
+  };
+
+  // visar om slotten är “andra delen” av en 2h-block (för “tail” highlight)
+  const isTwoHourTail = (activityId, startISO) => {
+    const b = getActivityBookData(activityId);
+    const av = availabilityMap[activityId];
+    const slots = av?.slots || [];
+    const idx = slots.findIndex((s) => s.startISO === startISO);
+    if (idx === -1) return false;
+
+    // om någon 2h selection startar på slotten precis innan denna
+    const prev = slots[idx - 1];
+    if (!prev) return false;
+
+    return (b.selections || []).some(
+      (sel) => sel.durationSlots === 2 && sel.startISO === prev.startISO
+    );
+  };
 
   // --------------------
   // Picking slots
@@ -534,16 +604,10 @@ const Home = () => {
 
                 <div className="helper-card">
                   <div className="helper-row">
-                    <div className="helper-title">Tracks</div>
+                    <div className="helper-title">Banor</div>
                     <div className="helper-text">
-                      Tracks = hur många som kan boka samma slot samtidigt
-                      (t.ex. antal banor).
-                    </div>
-                  </div>
-                  <div className="helper-row">
-                    <div className="helper-title">1h / 2h</div>
-                    <div className="helper-text">
-                      1h = en slot. 2h = två slots i rad.
+                      För att boka flera banor krävs det att välja exempelvis 2
+                      styck 1 timmes.
                     </div>
                   </div>
                 </div>
@@ -571,8 +635,7 @@ const Home = () => {
                           <div>
                             <h3 className="activity-name">{activity.title}</h3>
                             <p className="muted" style={{ margin: 0 }}>
-                              Kapacitet per slot:{" "}
-                              <strong>{activity.tracks}</strong>
+                              Antal banor: <strong>{activity.tracks}</strong>
                             </p>
                           </div>
 
@@ -599,6 +662,27 @@ const Home = () => {
                                 activity.id,
                                 slot.startISO,
                                 av?.slotMinutes || 60
+                              );
+
+                              const price1 = Number(slot.slotPrice || 0);
+
+                              const price2 = slots[idx + 1]
+                                ? Number(slot.slotPrice || 0) +
+                                  Number(slots[idx + 1].slotPrice || 0)
+                                : 0;
+
+                              const currency = slot.currency || "SEK";
+
+                              const covered = getCoveredStartISOs(activity.id);
+                              const isSelected = covered.has(slot.startISO);
+
+                              const isStart2h = isTwoHourStart(
+                                activity.id,
+                                slot.startISO
+                              );
+                              const isTail2h = isTwoHourTail(
+                                activity.id,
+                                slot.startISO
                               );
 
                               const left = Math.max(
@@ -628,9 +712,12 @@ const Home = () => {
                               return (
                                 <div
                                   key={slot.startISO}
-                                  className={`slot-card ${
-                                    left === 0 ? "slot-card-disabled" : ""
-                                  }`}
+                                  className={`slot-card 
+    ${left === 0 ? "slot-card-disabled" : ""} 
+    ${isSelected ? "slot-selected" : ""} 
+    ${isStart2h ? "slot-selected-start" : ""} 
+    ${isTail2h ? "slot-selected-tail" : ""}
+  `}
                                 >
                                   <div className="slot-top">
                                     <div className="slot-time">{timeLabel}</div>
@@ -661,7 +748,13 @@ const Home = () => {
                                   </div>
 
                                   <div className="slot-foot muted">
-                                    2h kräver två tider i rad
+                                    <strong>
+                                      {price1.toFixed(0)} kr /{" "}
+                                      {av?.slotMinutes || 60} min
+                                    </strong>
+                                  </div>
+                                  <div className="slot-foot muted">
+                                    Flera banor kräver flera tider i rad.
                                   </div>
                                 </div>
                               );
@@ -746,6 +839,14 @@ const Home = () => {
                                   <div className="muted">
                                     {sel.durationSlots}h
                                   </div>
+                                </div>
+                                <div className="muted">
+                                  {calcSelectionPrice(
+                                    book.activityId,
+                                    sel.startISO,
+                                    sel.durationSlots
+                                  ).toFixed(0)}{" "}
+                                  kr
                                 </div>
                                 <button
                                   className="btn btn-ghost"

@@ -94,6 +94,41 @@ const generateDaySlots = ({ dateISO, availability, slotMinutes }) => {
   return slots;
 };
 
+const getPriceForSlot = ({ pricingRules, dateISO, startHHMM }) => {
+  const fallback = pricingRules?.defaultPricePerHour ?? 0;
+
+  const ex = (pricingRules?.exceptions || []).find((e) => e.date === dateISO);
+  if (ex?.closed)
+    return { pricePerHour: 0, currency: pricingRules?.currency || "SEK" };
+
+  const ranges = ex?.ranges?.length
+    ? ex.ranges
+    : (() => {
+        const weekday = makeLocalDate(dateISO, "00:00").getDay();
+        const w = (pricingRules?.weekly || []).find((x) => x.day === weekday);
+        return w?.ranges || [];
+      })();
+
+  const t = hhmmToMinutes(startHHMM);
+
+  for (const r of ranges) {
+    if (!isValidHHMM(r.start) || !isValidHHMM(r.end)) continue;
+    const a = hhmmToMinutes(r.start);
+    const b = hhmmToMinutes(r.end);
+    if (a <= t && t < b) {
+      return {
+        pricePerHour: Number(r.pricePerHour),
+        currency: pricingRules?.currency || "SEK",
+      };
+    }
+  }
+
+  return {
+    pricePerHour: Number(fallback),
+    currency: pricingRules?.currency || "SEK",
+  };
+};
+
 // --------------------
 // POST /activity/create
 // Body: { title, information, imageUrl, tracks, workshopId, bookingRules, useWorkshopAvailability, availability }
@@ -107,6 +142,7 @@ const createActivity = async (req, res) => {
       tracks,
       workshopId,
       bookingRules,
+      pricingRules,
       useWorkshopAvailability,
       availability,
     } = req.body;
@@ -134,6 +170,7 @@ const createActivity = async (req, res) => {
       tracks: Number(tracks),
       workshopId,
       bookingRules: bookingRules || undefined,
+      pricingRules: pricingRules || undefined,
       useWorkshopAvailability:
         useWorkshopAvailability !== false &&
         useWorkshopAvailability !== "false",
@@ -144,6 +181,63 @@ const createActivity = async (req, res) => {
     });
 
     return res.status(201).json({ ok: true, activity: doc });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+};
+
+// --------------------
+// PATCH /activity/:id
+// Body: valfria fält som ska uppdateras
+// --------------------
+const updateActivity = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const patch = { ...req.body };
+
+    // säkerställ att tracks/slotMinutes osv blir nummer om de kommer som string
+    if (patch.tracks !== undefined) patch.tracks = Number(patch.tracks);
+    if (patch.bookingRules?.slotMinutes !== undefined)
+      patch.bookingRules.slotMinutes = Number(patch.bookingRules.slotMinutes);
+    if (patch.bookingRules?.minSlots !== undefined)
+      patch.bookingRules.minSlots = Number(patch.bookingRules.minSlots);
+    if (patch.bookingRules?.maxSlots !== undefined)
+      patch.bookingRules.maxSlots = Number(patch.bookingRules.maxSlots);
+
+    if (patch.pricingRules?.defaultPricePerHour !== undefined)
+      patch.pricingRules.defaultPricePerHour = Number(
+        patch.pricingRules.defaultPricePerHour
+      );
+
+    const updated = await Activity.findByIdAndUpdate(id, patch, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!updated) {
+      return res.status(404).json({ ok: false, message: "Activity not found" });
+    }
+
+    return res.json({ ok: true, activity: updated });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+};
+
+// --------------------
+// DELETE /activity/:id
+// --------------------
+const deleteActivity = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deleted = await Activity.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ ok: false, message: "Activity not found" });
+    }
+
+    return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });
   }
@@ -168,6 +262,8 @@ const listActivities = async (req, res) => {
       imageUrl: a.imageUrl,
       tracks: a.tracks,
       bookingRules: a.bookingRules,
+      pricingRules: a.pricingRules,
+      useWorkshopAvailability: a.useWorkshopAvailability,
       workshopId: a.workshopId,
     }));
 
@@ -251,12 +347,31 @@ const getActivityAvailability = async (req, res) => {
         }, 0);
 
         const availableTracks = Math.max(0, act.tracks - taken);
+
+        const startLocal = new Date(s.startISO);
+        const startHHMM = startLocal.toLocaleTimeString("sv-SE", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        const { pricePerHour, currency } = getPriceForSlot({
+          pricingRules: act.pricingRules,
+          dateISO,
+          startHHMM,
+        });
+
+        const slotPrice =
+          Math.round(pricePerHour * (slotMinutes / 60) * 100) / 100;
+
         slots.push({
           dateISO,
           startISO: s.startISO,
           endISO: s.endISO,
           availableTracks,
           isAvailable: availableTracks > 0,
+          pricePerHour,
+          slotPrice,
+          currency,
         });
       }
     }
@@ -279,4 +394,6 @@ module.exports = {
   listActivities,
   getActivity,
   getActivityAvailability,
+  updateActivity,
+  deleteActivity,
 };

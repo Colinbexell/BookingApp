@@ -7,6 +7,8 @@ const {
   listActivities,
   getActivity,
   getActivityAvailability,
+  updateActivity,
+  deleteActivity,
 } = require("../controllers/activityController");
 
 // samma CORS-stil som dina andra routes :contentReference[oaicite:5]{index=5}
@@ -21,5 +23,7 @@ router.post("/create", createActivity);
 router.get("/", listActivities);
 router.get("/:id", getActivity);
 router.get("/:id/availability", getActivityAvailability);
+router.patch("/:id", updateActivity);
+router.delete("/:id", deleteActivity);
 
 module.exports = router;

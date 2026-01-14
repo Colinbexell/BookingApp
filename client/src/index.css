@@ -166,7 +166,7 @@ input {
   border: none;
   border-radius: 5px;
   background-color: var(--lines);
-  color: var(--text);
+  color: var(--text-dark);
   font-size: 16px;
   margin-top: 1.5vh;
   transition: all ease-in-out 0.1s;
@@ -216,6 +216,7 @@ p,
 label,
 span,
 div,
+textarea,
 strong {
   color: var(--text-dark);
 }

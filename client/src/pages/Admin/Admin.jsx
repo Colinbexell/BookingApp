@@ -44,15 +44,35 @@ const Admin = () => {
     d.setDate(d.getDate() + 7);
     return d.toISOString().slice(0, 10);
   });
+  const [bookingSearch, setBookingSearch] = useState("");
+
+  // Avboknings Popup
+  const [cancelPopupOpen, setCancelPopupOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState(null); // booking-raden
+  const [isCancelling, setIsCancelling] = useState(false);
 
   // Popup skapa aktivitet
   const [newActPopupVisible, setNewActPopupVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [editorMode, setEditorMode] = useState("create"); // "create" | "edit"
+  const [selectedActivityId, setSelectedActivityId] = useState(null);
+
+  // pricing form
+  const [defaultPricePerHour, setDefaultPricePerHour] = useState(279);
+  const [weeklyPricing, setWeeklyPricing] = useState([]);
+
+  const emptyWeeklyPricing = () =>
+    Array.from({ length: 7 }).map((_, day) => ({ day, ranges: [] }));
+
   // Ny aktivitet form
   const [title, setTitle] = useState("");
   const [information, setInformation] = useState("");
+  // Bild variabler
   const [imageUrl, setImageUrl] = useState("");
+  const [imageFile, setImageFile] = useState(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  //
   const [tracks, setTracks] = useState(2);
   const [useWorkshopAvailability, setUseWorkshopAvailability] = useState(true);
   const [slotMinutes, setSlotMinutes] = useState(60);
@@ -60,6 +80,134 @@ const Admin = () => {
   const [maxSlots, setMaxSlots] = useState(2);
 
   const canUseAdmin = useMemo(() => !!workshopId, [workshopId]);
+
+  // Hantera bilduppladning
+  const uploadActivityImage = async () => {
+    if (!imageFile) return toast.error("Välj en bild först");
+
+    try {
+      setIsUploadingImage(true);
+
+      const form = new FormData();
+      form.append("image", imageFile);
+
+      const res = await axios.post("/upload/activity-image", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setImageUrl(res.data.imageUrl);
+      toast.success("Bild uppladdad ✅");
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Kunde inte ladda upp bild");
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
+  // Öppnar edit aktivitetsläge
+  const openEdit = async (id) => {
+    try {
+      const res = await axios.get(`/activity/${id}`);
+      const act = res.data.activity;
+      setImageFile(null);
+
+      setEditorMode("edit");
+      setSelectedActivityId(id);
+
+      setTitle(act.title || "");
+      setInformation(act.information || "");
+      setImageUrl(act.imageUrl || "");
+      setTracks(act.tracks || 2);
+
+      setUseWorkshopAvailability(
+        act.useWorkshopAvailability !== false &&
+          act.useWorkshopAvailability !== "false"
+      );
+
+      setSlotMinutes(act.bookingRules?.slotMinutes || 60);
+      setMinSlots(act.bookingRules?.minSlots || 1);
+      setMaxSlots(act.bookingRules?.maxSlots || 2);
+
+      setDefaultPricePerHour(act.pricingRules?.defaultPricePerHour ?? 279);
+      setWeeklyPricing(
+        act.pricingRules?.weekly?.length
+          ? act.pricingRules.weekly
+          : emptyWeeklyPricing()
+      );
+
+      setNewActPopupVisible(true);
+    } catch {
+      toast.error("Kunde inte öppna aktivitet");
+    }
+  };
+
+  // Helpers för att sätta pris range
+  const addPriceRange = (day) => {
+    setWeeklyPricing((prev) =>
+      prev.map((d) =>
+        d.day === day
+          ? {
+              ...d,
+              ranges: [
+                ...d.ranges,
+                { start: "15:00", end: "18:00", pricePerHour: 279 },
+              ],
+            }
+          : d
+      )
+    );
+  };
+
+  const updatePriceRange = (day, idx, patch) => {
+    setWeeklyPricing((prev) =>
+      prev.map((d) =>
+        d.day === day
+          ? {
+              ...d,
+              ranges: d.ranges.map((r, i) =>
+                i === idx ? { ...r, ...patch } : r
+              ),
+            }
+          : d
+      )
+    );
+  };
+
+  const removePriceRange = (day, idx) => {
+    setWeeklyPricing((prev) =>
+      prev.map((d) =>
+        d.day === day
+          ? { ...d, ranges: d.ranges.filter((_, i) => i !== idx) }
+          : d
+      )
+    );
+  };
+
+  // Avboka en bokning
+  const cancelBookingRow = (b) => {
+    if (b.status !== "active") return;
+    setCancelTarget(b);
+    setCancelPopupOpen(true);
+  };
+
+  const confirmCancelBooking = async () => {
+    if (!cancelTarget) return;
+
+    try {
+      setIsCancelling(true);
+      await axios.patch("/booking/cancel", {
+        bookingIds: cancelTarget.bookingIds,
+      });
+      toast.success("Bokningen avbokad ✅");
+      setCancelPopupOpen(false);
+      setCancelTarget(null);
+      loadBookings();
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Kunde inte avboka");
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   // --- Load activities ---
   const loadActivities = async () => {
@@ -85,8 +233,11 @@ const Admin = () => {
 
       const normalized = (res.data.bookings || []).map((b) => {
         return {
-          id: b._id,
+          id: b.id,
+          bookingIds: b.bookingIds || [],
           customerName: b.customerName || "Okänt namn",
+          email: b.email || "",
+          phone: b.phone || "",
 
           // 🔥 AKTIVITET
           activityTitle:
@@ -105,6 +256,10 @@ const Admin = () => {
 
           // 📌 STATUS
           status: b.status || "active",
+
+          // 💳 PRIS
+          totalPrice: Number(b.totalPrice ?? 0),
+          currency: b.currency || "SEK",
         };
       });
 
@@ -155,7 +310,7 @@ const Admin = () => {
     try {
       setIsSubmitting(true);
 
-      await axios.post("/activity/create", {
+      const payload = {
         title,
         information,
         imageUrl,
@@ -166,27 +321,28 @@ const Admin = () => {
           minSlots: Number(minSlots),
           maxSlots: Number(maxSlots),
         },
+        pricingRules: {
+          currency: "SEK",
+          defaultPricePerHour: Number(defaultPricePerHour),
+          weekly: weeklyPricing,
+          exceptions: [],
+        },
         useWorkshopAvailability,
-        // om du vill ha activity-specific availability senare:
-        // availability: useWorkshopAvailability ? undefined : { weekly: [...], exceptions:[...] }
-      });
+      };
 
-      toast.success("Aktivitet skapad ✅");
-      setNewActPopupVisible(false);
-
-      // reset form
-      setTitle("");
-      setInformation("");
+      if (editorMode === "create") {
+        await axios.post("/activity/create", payload);
+        toast.success("Aktivitet skapad ✅");
+      } else {
+        await axios.patch(`/activity/${selectedActivityId}`, payload);
+        toast.success("Aktivitet uppdaterad ✅");
+      }
+      setImageFile(null);
       setImageUrl("");
-      setTracks(2);
-      setUseWorkshopAvailability(true);
-      setSlotMinutes(60);
-      setMinSlots(1);
-      setMaxSlots(2);
-
+      setNewActPopupVisible(false);
       loadActivities();
     } catch (e) {
-      toast.error(e?.response?.data?.message || "Kunde inte skapa aktivitet");
+      toast.error(e?.response?.data?.message || "Kunde inte spara aktivitet");
     } finally {
       setIsSubmitting(false);
     }
@@ -234,8 +390,18 @@ const Admin = () => {
     );
   };
 
-  console.log("userData:", user);
-  console.log("workshopId vi använder:", workshopId);
+  const filteredBookings = useMemo(() => {
+    const q = bookingSearch.trim().toLowerCase();
+    if (!q) return bookings;
+
+    return bookings.filter((b) => {
+      return (
+        (b.customerName || "").toLowerCase().includes(q) ||
+        (b.email || "").toLowerCase().includes(q) ||
+        (b.phone || "").toLowerCase().includes(q)
+      );
+    });
+  }, [bookings, bookingSearch]);
 
   // --- UI pages ---
   const renderBookings = () => {
@@ -249,6 +415,13 @@ const Admin = () => {
               </div>
 
               <div className="bookings-controls">
+                <input
+                  className="booking-search"
+                  type="text"
+                  placeholder="Sök namn, mail eller telefon…"
+                  value={bookingSearch}
+                  onChange={(e) => setBookingSearch(e.target.value)}
+                />
                 <input
                   type="date"
                   value={fromDate}
@@ -271,8 +444,10 @@ const Admin = () => {
                 <div>Aktivitet</div>
                 <div>Tid</div>
                 <div>Banor</div>
+                <div>Pris</div>
                 <div>Betalning</div>
                 <div>Status</div>
+                <div>Åtgärd</div>
               </div>
 
               {bookings.length === 0 ? (
@@ -280,7 +455,7 @@ const Admin = () => {
                   Inga bokningar i valt intervall.
                 </div>
               ) : (
-                bookings.map((b) => {
+                filteredBookings.map((b) => {
                   const start = capitalize(
                     new Date(b.startAt).toLocaleString("sv-SE", {
                       weekday: "short",
@@ -324,6 +499,19 @@ const Admin = () => {
                         <span className="badge">{b.quantity} st</span>
                       </div>
 
+                      {/* 💳 Pris */}
+                      <div>
+                        <strong>
+                          {Math.round(b.totalPrice)} {b.currency}
+                        </strong>
+                        {b.quantity > 1 ? (
+                          <div className="booking-subprice">
+                            {Math.round(b.totalPrice / b.quantity)} {b.currency}
+                            /st
+                          </div>
+                        ) : null}
+                      </div>
+
                       {/* 💳 Betalning */}
                       <div>
                         <span
@@ -344,6 +532,16 @@ const Admin = () => {
                         >
                           {b.status === "active" ? "Aktiv" : "Avbokad"}
                         </span>
+                      </div>
+                      <div className="booking-actions">
+                        <button
+                          className="admin-btn danger small"
+                          onClick={() => cancelBookingRow(b)}
+                          disabled={b.status !== "active"}
+                          title="Avboka"
+                        >
+                          Avboka
+                        </button>
                       </div>
                     </div>
                   );
@@ -369,7 +567,13 @@ const Admin = () => {
             <div className="admin-actions">
               <button
                 className="admin-btn"
-                onClick={() => setNewActPopupVisible(true)}
+                onClick={() => {
+                  setEditorMode("create");
+                  setSelectedActivityId(null);
+                  setWeeklyPricing(emptyWeeklyPricing());
+                  setDefaultPricePerHour(279);
+                  setNewActPopupVisible(true);
+                }}
               >
                 + Skapa aktivitet
               </button>
@@ -387,6 +591,7 @@ const Admin = () => {
                 title={a.title}
                 imageUrl={a.imageUrl}
                 tracks={a.tracks}
+                onClick={() => openEdit(a.id)}
               />
             ))}
           </div>
@@ -633,6 +838,7 @@ const Admin = () => {
       <Sidebar page={page} setpage={setpage} />
       {renderContent()}
 
+      {/* Ny aktivitet / redigera aktivitets pop up */}
       {newActPopupVisible ? (
         <div className="popup" onClick={() => setNewActPopupVisible(false)}>
           <div className="new-act-window" onClick={(e) => e.stopPropagation()}>
@@ -660,22 +866,126 @@ const Admin = () => {
               />
             </div>
 
-            <div className="new-act-input">
-              <h3 className="new-act-h3">Bild URL</h3>
-              <input
-                type="text"
-                className="normal-input"
-                placeholder="/uploads/bowling.jpg eller https://..."
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-              />
+            <div className="pricing-card">
+              <h3 className="pricing-title">Prissättning</h3>
+              <p className="admin-muted pricing-subtitle">
+                Default gäller om ingen regel matchar. Veckoregler kan ge olika
+                pris per tid och dag.
+              </p>
+
+              <div className="admin-row admin-row-half pricing-default-row">
+                <div className="admin-field pricing-default-field">
+                  <p>Default (kr/timme)</p>
+                  <input
+                    type="number"
+                    min="0"
+                    value={defaultPricePerHour}
+                    onChange={(e) => setDefaultPricePerHour(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="weekly-grid weekly-grid-spacing">
+                {weeklyPricing.map((d) => (
+                  <div key={d.day} className="admin-card pricing-day-card">
+                    <div className="admin-row pricing-day-header">
+                      <strong>{dayNames[d.day]}</strong>
+                      <button
+                        className="admin-btn secondary"
+                        onClick={() => addPriceRange(d.day)}
+                      >
+                        + Lägg till intervall
+                      </button>
+                    </div>
+
+                    {d.ranges.length === 0 ? (
+                      <p className="admin-muted pricing-empty">
+                        Inga regler (defaultpris används)
+                      </p>
+                    ) : (
+                      <div className="exceptions-list pricing-ranges">
+                        {d.ranges.map((r, idx) => (
+                          <div
+                            key={idx}
+                            className="exception-item pricing-range-row"
+                          >
+                            <input
+                              type="time"
+                              value={r.start}
+                              onChange={(e) =>
+                                updatePriceRange(d.day, idx, {
+                                  start: e.target.value,
+                                })
+                              }
+                            />
+                            <input
+                              type="time"
+                              value={r.end}
+                              onChange={(e) =>
+                                updatePriceRange(d.day, idx, {
+                                  end: e.target.value,
+                                })
+                              }
+                            />
+                            <input
+                              type="number"
+                              min="0"
+                              value={r.pricePerHour}
+                              onChange={(e) =>
+                                updatePriceRange(d.day, idx, {
+                                  pricePerHour: e.target.value,
+                                })
+                              }
+                              placeholder="kr/timme"
+                            />
+                            <div className="pricing-range-spacer" />
+                            <button
+                              className="admin-btn danger"
+                              onClick={() => removePriceRange(d.day, idx)}
+                            >
+                              Ta bort
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div
-              className="admin-row"
-              style={{ width: "50%", gap: 12, marginTop: 12 }}
-            >
-              <div className="admin-field" style={{ flex: 1 }}>
+            <div className="new-act-input">
+              <h3 className="new-act-h3">Bild</h3>
+
+              <div className="image-upload-row">
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                />
+
+                <button
+                  className="admin-btn secondary"
+                  type="button"
+                  onClick={uploadActivityImage}
+                  disabled={isUploadingImage || !imageFile}
+                >
+                  {isUploadingImage ? "Laddar upp..." : "Ladda upp"}
+                </button>
+              </div>
+
+              {imageUrl ? (
+                <div className="image-preview">
+                  <img src={API_BASE_URL + imageUrl} alt="Preview" />
+                  <p className="admin-muted">{imageUrl}</p>
+                </div>
+              ) : (
+                <p className="admin-muted">Ingen bild uppladdad ännu.</p>
+              )}
+            </div>
+
+            <div className="admin-row admin-row-half admin-row-gap-md admin-row-top-md">
+              <div className="admin-field">
                 <p>Tracks</p>
                 <input
                   type="number"
@@ -685,7 +995,7 @@ const Admin = () => {
                 />
               </div>
 
-              <div className="admin-field" style={{ flex: 1 }}>
+              <div className="admin-field">
                 <p>Slot (min)</p>
                 <input
                   type="number"
@@ -697,11 +1007,8 @@ const Admin = () => {
               </div>
             </div>
 
-            <div
-              className="admin-row"
-              style={{ width: "50%", gap: 12, marginTop: 12 }}
-            >
-              <div className="admin-field" style={{ flex: 1 }}>
+            <div className="admin-row admin-row-half admin-row-gap-md admin-row-top-md">
+              <div className="admin-field">
                 <p>Min timmar</p>
                 <input
                   type="number"
@@ -712,7 +1019,7 @@ const Admin = () => {
                 />
               </div>
 
-              <div className="admin-field" style={{ flex: 1 }}>
+              <div className="admin-field">
                 <p>Max timmar</p>
                 <input
                   type="number"
@@ -724,8 +1031,8 @@ const Admin = () => {
               </div>
             </div>
 
-            <div className="admin-row" style={{ width: "50%", marginTop: 14 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div className="admin-row admin-row-half admin-row-top-lg">
+              <label className="admin-checkbox-row">
                 <input
                   type="checkbox"
                   checked={useWorkshopAvailability}
@@ -735,22 +1042,107 @@ const Admin = () => {
               </label>
             </div>
 
-            <div
-              className="admin-row"
-              style={{ width: "50%", marginTop: 16, gap: 10 }}
-            >
-              <button
-                className="admin-btn"
-                onClick={submitActivity}
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Skapar..." : "Skapa aktivitet"}
-              </button>
+            <div className="admin-row admin-row-half admin-row-top-xl admin-actions-row">
               <button
                 className="admin-btn danger"
                 onClick={() => setNewActPopupVisible(false)}
               >
                 Avbryt
+              </button>
+
+              {editorMode === "edit" ? (
+                <button
+                  className="admin-btn danger"
+                  onClick={async () => {
+                    try {
+                      setIsSubmitting(true);
+                      await axios.delete(`/activity/${selectedActivityId}`);
+                      toast.success("Aktivitet borttagen ✅");
+                      setNewActPopupVisible(false);
+                      loadActivities();
+                    } catch {
+                      toast.error("Kunde inte ta bort aktivitet");
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Ta bort aktivitet
+                </button>
+              ) : null}
+
+              <button
+                className="admin-btn"
+                onClick={submitActivity}
+                disabled={isSubmitting}
+              >
+                {editorMode === "edit"
+                  ? isSubmitting
+                    ? "Uppdaterar..."
+                    : "Uppdatera aktivitet"
+                  : isSubmitting
+                  ? "Skapar..."
+                  : "Skapa aktivitet"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Avboknings pop up */}
+      {cancelPopupOpen ? (
+        <div
+          className="popup"
+          onClick={() => {
+            if (isCancelling) return;
+            setCancelPopupOpen(false);
+            setCancelTarget(null);
+          }}
+        >
+          <div className="confirm-window" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-top">
+              <div className="confirm-icon">!</div>
+              <div>
+                <h2 className="confirm-title">Avboka bokning</h2>
+                <p className="confirm-sub">
+                  Är du säker att du vill avboka bokning för{" "}
+                  <strong>{cancelTarget?.customerName}</strong>?
+                </p>
+              </div>
+            </div>
+
+            <div className="confirm-details">
+              <div className="confirm-chip">{cancelTarget?.email}</div>
+              <div className="confirm-chip">{cancelTarget?.phone}</div>
+              <div className="confirm-chip">
+                {cancelTarget?.quantity} bana(or)
+              </div>
+              <div className="confirm-chip">
+                {Math.round(cancelTarget?.totalPrice || 0)}{" "}
+                {cancelTarget?.currency || "SEK"}
+              </div>
+              <div className="confirm-chip">{cancelTarget?.activityTitle}</div>
+            </div>
+
+            <div className="confirm-actions">
+              <button
+                className="admin-btn secondary"
+                onClick={() => {
+                  if (isCancelling) return;
+                  setCancelPopupOpen(false);
+                  setCancelTarget(null);
+                }}
+              >
+                Nej, stäng
+              </button>
+
+              <button
+                className="admin-btn danger"
+                onClick={confirmCancelBooking}
+                disabled={isCancelling}
+              >
+                {isCancelling ? "Avbokar..." : "Ja, avboka"}
               </button>
             </div>
           </div>

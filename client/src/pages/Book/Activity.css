@@ -1,106 +1,195 @@
+/* ===== Card base ===== */
 .main_card {
-  height: 350px;
-  width: 300px;
-  background-color: blue;
+  width: 240px;
+  border-radius: var(--border-radius);
+  background: white;
+  box-shadow: 0 3px 10px 6px #00000029;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+
+  scrollbar-width: none;
+
+  overflow-x: hidden;
+  overflow: visible;
+  position: relative;
+  cursor: pointer;
+
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: start;
-  padding-top: 10px;
-  padding-bottom: 20px;
-  background-color: rgb(255, 255, 255);
-  box-shadow: 0 3px 10px 6px #00000029;
-  border-radius: var(--border-radius);
-  transition: all ease-in-out 0.2s;
-  overflow: hidden;
-  cursor: pointer;
+
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
 .main_card:hover {
-  height: 550px;
   transform: scale(1.02);
-  border: solid 1px var(--primary);
+  border-color: var(--primary);
   box-shadow: 0 3px 10px 6px var(--primary-shadow);
+  z-index: 20;
 }
 
-/* Info text på kortet */
-.info {
-  display: none;
-  width: 90%;
-}
-.main_card:hover .info,
-.main_card:hover .amount,
-.main_card:hover .next {
-  display: flex;
-}
-
+/* ===== Image: same size, no distortion ===== */
 .main_card img {
   width: 90%;
+  margin: 10px auto 0 auto;
+
+  aspect-ratio: 4 / 5; /* lite högre än bred */
+  object-fit: cover;
   border-radius: var(--border-radius-2);
+
+  display: block;
+  transition: transform 0.25s ease;
 }
 
+.main_card:hover img {
+  transform: scale(1.03);
+}
+
+/* ===== Title ===== */
 .main_card h3 {
   color: var(--text-dark);
-  font-weight: 600;
-  font-size: medium;
+  font-weight: 700;
+  font-size: 15px;
+  width: 100%;
+  text-align: center;
 }
 
-.main_card p {
-  color: var(--text-dark);
-  font-weight: 600;
-  font-size: small;
+/* ===== Expand panel (the "drop down") ===== */
+.card-expand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%; /* börjar precis under kortet */
+  z-index: 50;
+
+  margin-top: 10px;
+  padding: 14px;
+
+  background: white;
+  border-radius: var(--border-radius);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.18);
+
+  /* animation */
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+
+  transition: opacity 0.18s ease, transform 0.22s ease;
 }
 
-/* Amount diven där antalet timmar väljs */
+/* hover: visa */
+.main_card:hover .card-expand {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.main_card::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -12px;
+  height: 12px;
+}
+
+/* Om du vill att hela hover-zonen ska vara stabil:
+   gör att även hover på dropdownen håller den öppen */
+.main_card:hover .card-expand,
+.card-expand:hover {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* ===== Info text ===== */
+.info {
+  margin: 0 0 10px 0;
+  color: rgba(0, 0, 0, 0.72);
+  font-size: 13px;
+  line-height: 1.35;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 3; /* håll den tight */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ===== Amount rows ===== */
 .amount {
-  display: none;
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 90%;
-}
-/* Räknaren till höger på kortet */
-.counter {
-  display: flex;
-  width: 40%;
-  align-items: center;
-  justify-content: space-evenly;
+  gap: 10px;
+
+  width: 100%;
+  margin-top: 10px;
 }
 
-/* Räknar knapp */
-.c_button {
-  width: 20px;
-  height: 20px;
+.amount p {
+  margin: 0;
+  color: var(--text-dark);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* ===== Counter ===== */
+.counter {
   display: flex;
-  border-radius: 6px;
   align-items: center;
-  justify-content: center;
-  background-color: transparent;
-  border: solid 2px var(--primary);
+  justify-content: space-evenly;
+  gap: 10px;
+}
+
+.counter p {
+  margin: 0;
+  min-width: 18px;
+  text-align: center;
+  font-weight: 800;
+}
+
+/* ===== Counter button ===== */
+.c_button {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+
+  border-radius: 8px;
+  border: 2px solid var(--primary);
+  background: transparent;
   color: var(--primary);
-  transition: all ease-in-out 0.1s;
-  font-size: x-large;
+
+  transition: transform 0.1s ease, background-color 0.12s ease, color 0.12s ease,
+    box-shadow 0.12s ease;
+  font-size: 18px;
+  font-weight: 900;
+  user-select: none;
 }
 
 .c_button:active {
-  background-color: var(--primary);
-  border: none;
+  background: var(--primary);
   color: white;
   box-shadow: 0 3px 10px 6px var(--primary-shadow);
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
+/* ===== Next button ===== */
 .next {
-  display: none;
-  position: absolute;
-  bottom: 10px;
-  background-color: var(--primary);
-  color: white;
-  width: 80px;
+  margin-top: 12px;
+  width: 100%;
   height: 40px;
-  transition: all ease-in-out 0.2s;
+
+  border: none;
+  border-radius: 14px;
+
+  background: var(--primary);
+  color: white;
+  font-weight: 800;
+
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 
 .next:active {
   box-shadow: 0 3px 10px 6px var(--primary-shadow);
-  transform: scale(1.05);
+  transform: scale(1.03);
 }

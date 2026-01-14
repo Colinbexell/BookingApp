@@ -5,7 +5,7 @@ Client:
 npm i vite@latest react-router-dom axios react-hot-toast 
 
 Server:
-npm i cors express nodemon bcrypt jsonwebtoken cookie-parser dotenv mongodb mongoose
+npm i cors express nodemon bcrypt jsonwebtoken cookie-parser dotenv mongodb mongoose multer
 
 Ändra DB_URL i .env filen samt JWT_SECRET i .env filen.
 

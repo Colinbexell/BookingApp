@@ -3,6 +3,8 @@ const dotenv = require("dotenv").config();
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
 const app = express();
+const path = require("path");
+const cors = require("cors");
 
 // DB connection
 mongoose
@@ -15,15 +17,24 @@ mongoose
   });
 
 // Middleware
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use("/user", require("./routes/authRoutes"));
 app.use("/company", require("./routes/companyRoutes"));
 app.use("/workshop", require("./routes/workshopRoutes"));
 app.use("/activity", require("./routes/activityRoutes"));
 app.use("/booking", require("./routes/bookingRoutes"));
+app.use("/upload", require("./routes/uploadRoutes"));
 
 // Start the server
 app.listen(6969, () => {
