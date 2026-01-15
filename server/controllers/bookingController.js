@@ -74,6 +74,7 @@ const createBooking = async (req, res) => {
       email,
       phone,
       paymentMethod,
+      partySize,
     } = req.body;
 
     if (!activityId)
@@ -96,8 +97,9 @@ const createBooking = async (req, res) => {
         .json({ message: "paymentMethod must be onsite|online" });
 
     const act = await Activity.findById(activityId).select(
-      "workshopId bookingRules pricingRules"
+      "workshopId bookingRules pricingRules tracks bookingUnit partyRules takesPayment"
     );
+
     if (!act) return res.status(400).json({ message: "Invalid activityId" });
 
     const slotMinutes = act.bookingRules?.slotMinutes || 60;
@@ -110,6 +112,39 @@ const createBooking = async (req, res) => {
       return res.status(400).json({ message: "startISO invalid date" });
 
     const endAt = new Date(startAt.getTime() + slots * slotMinutes * 60_000);
+
+    const ps = Math.max(1, Number(partySize || 1));
+
+    // Om aktiviteten är per_person: enforce min/max
+    if (act.bookingUnit === "per_person") {
+      const minP = Number(act.partyRules?.min ?? 1);
+      const maxP = Number(act.partyRules?.max ?? 99);
+
+      if (ps < minP || ps > maxP) {
+        return res.status(400).json({
+          message: `partySize must be between ${minP} and ${maxP}`,
+        });
+      }
+    }
+
+    const unitsNeeded = 1;
+
+    const overlapping = await Booking.find({
+      activityId: act._id,
+      status: "active",
+      startAt: { $lt: endAt },
+      endAt: { $gt: startAt },
+    }).select("partySize");
+
+    const unitsTaken = overlapping.length;
+
+    const capacity = Number(act.tracks || 0);
+
+    if (unitsTaken + unitsNeeded > capacity) {
+      return res.status(409).json({
+        message: "Den tiden har inte tillräcklig kapacitet kvar",
+      });
+    }
 
     const currency = act.pricingRules?.currency || "SEK";
     const unitPrices = [];
@@ -134,8 +169,21 @@ const createBooking = async (req, res) => {
       unitPrices.push(slotPrice);
     }
 
-    const totalPrice =
+    const baseTotal =
       Math.round(unitPrices.reduce((a, b) => a + b, 0) * 100) / 100;
+
+    let totalPrice = baseTotal;
+
+    // per person => multiplicera med sällskapets storlek
+    if (act.bookingUnit === "per_person") {
+      totalPrice = Math.round(baseTotal * ps * 100) / 100;
+    }
+
+    // gratis aktivitet => alltid 0 kr
+    const isPaid = act.takesPayment !== false;
+    if (!isPaid) {
+      totalPrice = 0;
+    }
 
     // TODO: här kan du stoppa in din “capacity check” (tracks) om du vill låsa på serversidan
     // Just nu: vi skapar bokningen rakt av.
@@ -152,11 +200,18 @@ const createBooking = async (req, res) => {
       endAt,
       durationSlots: slots,
 
-      paymentMethod,
-      paymentStatus: paymentMethod === "online" ? "paid" : "unpaid",
+      bookingUnit: act.bookingUnit || "per_lane",
+      partySize: ps,
 
-      currency,
-      unitPrices,
+      paymentMethod: isPaid ? paymentMethod : "onsite",
+      paymentStatus: isPaid
+        ? paymentMethod === "online"
+          ? "paid"
+          : "unpaid"
+        : "paid",
+
+      currency: act.pricingRules?.currency || "SEK",
+      unitPrices: isPaid ? unitPrices : [],
       totalPrice,
     });
 
@@ -213,6 +268,9 @@ const listBookingsForWorkshop = async (req, res) => {
           emailNorm: { $toLower: { $trim: { input: "$email" } } },
           phoneNorm: { $trim: { input: "$phone" } },
 
+          // ✅ NYTT: normalisera partySize
+          partySizeNorm: { $ifNull: ["$partySize", 1] },
+
           // gör att tider matchar även om ms skiljer
           startAtNorm: { $dateTrunc: { date: "$startAt", unit: "minute" } },
           endAtNorm: { $dateTrunc: { date: "$endAt", unit: "minute" } },
@@ -231,6 +289,9 @@ const listBookingsForWorkshop = async (req, res) => {
 
             startAt: "$startAtNorm",
             endAt: "$endAtNorm",
+
+            // ✅ NYTT: gör att bokningar med olika antal personer inte slås ihop
+            partySize: "$partySizeNorm",
 
             durationSlots: "$durationSlots",
             paymentStatus: "$paymentStatus",
@@ -268,6 +329,7 @@ const listBookingsForWorkshop = async (req, res) => {
           activityTitle: { $ifNull: ["$_id.activityTitle", "Aktivitet"] },
           startAt: "$_id.startAt",
           endAt: "$_id.endAt",
+          partySize: "$_id.partySize",
           durationSlots: "$_id.durationSlots",
           paymentStatus: "$_id.paymentStatus",
           paymentMethod: "$_id.paymentMethod",

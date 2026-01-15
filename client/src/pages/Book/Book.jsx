@@ -92,6 +92,9 @@ const Home = () => {
         info: a.information,
         img: a.imageUrl,
         tracks: a.tracks,
+        takesPayment: a.takesPayment !== false,
+        bookingUnit: a.bookingUnit || "per_lane",
+        partyRules: a.partyRules || { min: 1, max: 99 },
         bookingRules: a.bookingRules || {
           slotMinutes: 60,
           minSlots: 1,
@@ -118,21 +121,92 @@ const Home = () => {
   // --------------------
   // Cart helpers
   // --------------------
+  const getActivityById = (id) => activities.find((a) => a.id === id);
+
   const updateBookData = (field, value, activityId) => {
+    const act = getActivityById(activityId);
+    const isPerPerson = act?.bookingUnit === "per_person";
+
+    const minP = Number(act?.partyRules?.min ?? 1);
+    const maxP = Number(act?.partyRules?.max ?? 99);
+
     const existingIndex = bookData.findIndex(
       (b) => b.activityId === activityId
     );
 
+    // ✅ SPECIAL: partySize ska kunna skapa/uppdatera rad även om activity inte valts via amount1/amount2
+    if (field === "partySize") {
+      const nextPartySize = Math.min(
+        maxP,
+        Math.max(minP, Number(value || minP))
+      );
+
+      if (existingIndex !== -1) {
+        const updated = [...bookData];
+        const current = updated[existingIndex];
+
+        // per_person måste alltid ha minst 1 slot att välja tid för (annars kan man inte gå vidare)
+        const amount1 = isPerPerson
+          ? Math.max(1, Number(current.amount1 || 0))
+          : Number(current.amount1 || 0);
+        const amount2 = Number(current.amount2 || 0);
+
+        const nextObj = {
+          ...current,
+          partySize: nextPartySize,
+          amount1,
+          amount2,
+        };
+
+        const need = (nextObj.amount1 || 0) + (nextObj.amount2 || 0);
+        nextObj.selections = (nextObj.selections || []).slice(0, need);
+
+        updated[existingIndex] = nextObj;
+        setBookData(updated);
+        return;
+      }
+
+      // ✅ ingen rad ännu -> skapa en direkt
+      setBookData([
+        ...bookData,
+        {
+          activityId,
+          amount1: isPerPerson ? 1 : 0,
+          amount2: 0,
+          selections: [],
+          partySize: nextPartySize,
+        },
+      ]);
+      return;
+    }
+
+    // ---- standardflöde (amount1/amount2) ----
     if (existingIndex !== -1) {
       const updated = [...bookData];
       const current = updated[existingIndex];
 
       const nextObj = { ...current, [field]: value };
 
+      // per_person: se till att man aldrig hamnar på 0 total
+      if (isPerPerson) {
+        const total = (nextObj.amount1 || 0) + (nextObj.amount2 || 0);
+        if (total === 0) nextObj.amount1 = 1;
+
+        // per_person: om partySize saknas, sätt till min
+        if (!nextObj.partySize || Number(nextObj.partySize) < minP) {
+          nextObj.partySize = minP;
+        }
+      }
+
       const need = (nextObj.amount1 || 0) + (nextObj.amount2 || 0);
       nextObj.selections = (nextObj.selections || []).slice(0, need);
 
-      if ((nextObj.amount1 || 0) === 0 && (nextObj.amount2 || 0) === 0) {
+      // ta bort bara om per_lane och båda 0
+      if (
+        !isPerPerson &&
+        (nextObj.amount1 || 0) === 0 &&
+        (nextObj.amount2 || 0) === 0
+      ) {
         setBookData(updated.filter((_, idx) => idx !== existingIndex));
       } else {
         updated[existingIndex] = nextObj;
@@ -147,6 +221,8 @@ const Home = () => {
             amount1: field === "amount1" ? value : 0,
             amount2: field === "amount2" ? value : 0,
             selections: [],
+            // ✅ om per_person: starta på min, annars 1
+            partySize: isPerPerson ? minP : 1,
           },
         ]);
       }
@@ -160,6 +236,7 @@ const Home = () => {
         amount1: 0,
         amount2: 0,
         selections: [],
+        partySize: 1,
       }
     );
   };
@@ -210,7 +287,11 @@ const Home = () => {
         );
       }, 0);
 
-      return total + sum;
+      const act = activities.find((a) => a.id === booking.activityId);
+      const multiplier =
+        act?.bookingUnit === "per_person" ? Number(booking.partySize || 1) : 1;
+
+      return total + sum * multiplier;
     }, 0);
   };
 
@@ -420,7 +501,25 @@ const Home = () => {
 
   const nextPage = () => {
     if (page === 1) {
-      if (bookData.length !== 0) setPage(2);
+      if (bookData.length === 0) return;
+
+      // ✅ per_person: om man valt aktiviteten men inte valt 1h/2h-count,
+      // sätt default till 1x 1h så man kan välja en tid i nästa steg.
+      setBookData((prev) =>
+        prev.map((b) => {
+          const act = getActivityById(b.activityId);
+          if (!act) return b;
+
+          const hasCounts = (b.amount1 || 0) + (b.amount2 || 0) > 0;
+
+          if (act.bookingUnit === "per_person" && !hasCounts) {
+            return { ...b, amount1: 1, amount2: 0 };
+          }
+          return b;
+        })
+      );
+
+      setPage(2);
       return;
     }
 
@@ -435,6 +534,32 @@ const Home = () => {
         toast.error("Fyll i namn, mail och telefon");
         return;
       }
+
+      // ✅ validera partySize per aktivitet
+      for (const b of bookData) {
+        const act = getActivityById(b.activityId);
+        if (!act) continue;
+
+        const ps = Number(b.partySize || 1);
+
+        if (ps < 1) {
+          toast.error(`Välj antal personer för ${act.title}`);
+          return;
+        }
+
+        if (act.bookingUnit === "per_person") {
+          const minP = Number(act.partyRules?.min ?? 1);
+          const maxP = Number(act.partyRules?.max ?? 99);
+
+          if (ps < minP || ps > maxP) {
+            toast.error(
+              `${act.title}: sällskap måste vara mellan ${minP} och ${maxP}`
+            );
+            return;
+          }
+        }
+      }
+
       setPage(4);
     }
   };
@@ -462,6 +587,8 @@ const Home = () => {
           email,
           phone,
           paymentMethod, // onsite | online
+
+          partySize: Number(b.partySize || 1),
         }))
       );
 
@@ -538,6 +665,8 @@ const Home = () => {
                     updateBookData={updateBookData}
                     nextPage={nextPage}
                     bookData={getActivityBookData(act.id)}
+                    bookingUnit={act.bookingUnit}
+                    partyRules={act.partyRules}
                   />
                 ))}
               </div>
@@ -664,14 +793,28 @@ const Home = () => {
                                 av?.slotMinutes || 60
                               );
 
-                              const price1 = Number(slot.slotPrice || 0);
+                              const basePrice1 = Number(slot.slotPrice || 0);
 
-                              const price2 = slots[idx + 1]
+                              const basePrice2 = slots[idx + 1]
                                 ? Number(slot.slotPrice || 0) +
                                   Number(slots[idx + 1].slotPrice || 0)
                                 : 0;
 
                               const currency = slot.currency || "SEK";
+
+                              // ✅ per_person: visa pris baserat på valt sällskap
+                              const people = Number(b.partySize || 1);
+                              const multiplier =
+                                activity.bookingUnit === "per_person"
+                                  ? people
+                                  : 1;
+
+                              const price1 = Math.round(
+                                basePrice1 * multiplier
+                              );
+                              const price2 = Math.round(
+                                basePrice2 * multiplier
+                              );
 
                               const covered = getCoveredStartISOs(activity.id);
                               const isSelected = covered.has(slot.startISO);
@@ -749,12 +892,23 @@ const Home = () => {
 
                                   <div className="slot-foot muted">
                                     <strong>
-                                      {price1.toFixed(0)} kr /{" "}
+                                      {price1} {currency} /{" "}
                                       {av?.slotMinutes || 60} min
                                     </strong>
+                                    {activity.bookingUnit === "per_person" && (
+                                      <div
+                                        className="muted"
+                                        style={{ marginTop: 4 }}
+                                      >
+                                        ({Number(b.partySize || 1)} personer)
+                                      </div>
+                                    )}
                                   </div>
+
                                   <div className="slot-foot muted">
-                                    Flera banor kräver flera tider i rad.
+                                    {activity.bookingUnit === "per_person"
+                                      ? "Bokningen gäller 1 bana. Priset beror på antal personer."
+                                      : "Flera banor kräver flera tider i rad."}
                                   </div>
                                 </div>
                               );
@@ -902,6 +1056,10 @@ const Home = () => {
 
       // ✅ NY: Page 3 använder “pro”-layouten från Book.css
       case 3:
+        const shouldShowPartyPanel = bookData.some((b) => {
+          const act = activities.find((a) => a.id === b.activityId);
+          return act && act.bookingUnit !== "per_person";
+        });
         return (
           <div className="content booking-page">
             <div className="booking-header">
@@ -950,6 +1108,66 @@ const Home = () => {
                       placeholder="070-123 45 67"
                     />
                   </div>
+                  {shouldShowPartyPanel && (
+                    <div
+                      className="panel"
+                      style={{ width: "100%", maxWidth: 600, marginTop: 16 }}
+                    >
+                      <h3 style={{ marginTop: 0 }}>Sällskap</h3>
+
+                      {bookData.map((b) => {
+                        const act = activities.find(
+                          (a) => a.id === b.activityId
+                        );
+                        if (!act) return null;
+
+                        // ✅ bara per_lane visas här
+                        if (act.bookingUnit === "per_person") return null;
+
+                        const minP = Number(act.partyRules?.min ?? 1);
+                        const maxP = Number(act.partyRules?.max ?? 99);
+
+                        return (
+                          <div key={b.activityId} style={{ marginBottom: 14 }}>
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                              }}
+                            >
+                              <strong>{act.title}</strong>
+                              <span className="muted">Per bana</span>
+                            </div>
+
+                            <label
+                              className="muted"
+                              style={{ display: "block", marginTop: 6 }}
+                            >
+                              Antal personer i sällskapet (för statistik)
+                            </label>
+
+                            <input
+                              type="number"
+                              min={1}
+                              max={999}
+                              value={b.partySize || 1}
+                              onChange={(e) => {
+                                const v = Number(e.target.value || 1);
+                                setBookData((prev) =>
+                                  prev.map((x) =>
+                                    x.activityId === b.activityId
+                                      ? { ...x, partySize: v }
+                                      : x
+                                  )
+                                );
+                              }}
+                              style={{ width: "100%" }}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   <div className="actions">
                     <button

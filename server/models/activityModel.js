@@ -67,6 +67,21 @@ const activitySchema = new Schema(
       minSlots: { type: Number, default: 1 },
       maxSlots: { type: Number, default: 2 },
     },
+
+    takesPayment: { type: Boolean, default: true }, // true = betald, false = gratis
+
+    bookingUnit: {
+      type: String,
+      enum: ["per_lane", "per_person"],
+      default: "per_lane",
+      index: true,
+    },
+
+    // Regler för sällskap (primärt för per_person, men kan återanvändas)
+    partyRules: {
+      min: { type: Number, default: 1 },
+      max: { type: Number, default: 99 },
+    },
     pricingRules: {
       currency: { type: String, default: "SEK" },
       defaultPricePerHour: { type: Number, default: 279 },

@@ -27,8 +27,14 @@ const workshopSchema = new Schema(
     name: { type: String, required: true },
 
     availability: {
-      weekly: [weeklyAvailabilitySchema],
-      exceptions: [exceptionSchema],
+      weekly: {
+        type: [weeklyAvailabilitySchema],
+        default: [],
+      },
+      exceptions: {
+        type: [exceptionSchema],
+        default: [],
+      },
     },
   },
   { timestamps: true }

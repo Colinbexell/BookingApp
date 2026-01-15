@@ -68,6 +68,12 @@ const Admin = () => {
   // Ny aktivitet form
   const [title, setTitle] = useState("");
   const [information, setInformation] = useState("");
+
+  const [takesPayment, setTakesPayment] = useState(true);
+  const [bookingUnit, setBookingUnit] = useState("per_lane"); // per_lane | per_person
+  const [partyMin, setPartyMin] = useState(1);
+  const [partyMax, setPartyMax] = useState(8);
+
   // Bild variabler
   const [imageUrl, setImageUrl] = useState("");
   const [imageFile, setImageFile] = useState(null);
@@ -118,6 +124,13 @@ const Admin = () => {
       setInformation(act.information || "");
       setImageUrl(act.imageUrl || "");
       setTracks(act.tracks || 2);
+
+      setTakesPayment(act.takesPayment !== false);
+
+      setBookingUnit(act.bookingUnit || "per_lane");
+
+      setPartyMin(Number(act.partyRules?.min ?? 1));
+      setPartyMax(Number(act.partyRules?.max ?? 99));
 
       setUseWorkshopAvailability(
         act.useWorkshopAvailability !== false &&
@@ -238,6 +251,7 @@ const Admin = () => {
           customerName: b.customerName || "Okänt namn",
           email: b.email || "",
           phone: b.phone || "",
+          partySize: Number(b.partySize ?? 1),
 
           // 🔥 AKTIVITET
           activityTitle:
@@ -316,6 +330,13 @@ const Admin = () => {
         imageUrl,
         tracks: Number(tracks),
         workshopId,
+        takesPayment,
+        bookingUnit,
+        partyRules: {
+          min: Number(partyMin),
+          max: Number(partyMax),
+        },
+
         bookingRules: {
           slotMinutes: Number(slotMinutes),
           minSlots: Number(minSlots),
@@ -443,6 +464,7 @@ const Admin = () => {
                 <div>Namn</div>
                 <div>Aktivitet</div>
                 <div>Tid</div>
+                <div>Personer</div>
                 <div>Banor</div>
                 <div>Pris</div>
                 <div>Betalning</div>
@@ -492,6 +514,11 @@ const Admin = () => {
                       <div className="booking-time">
                         <strong>{start}</strong>
                         <span className="muted"> – {end}</span>
+                      </div>
+
+                      {/* 👥 Personer */}
+                      <div>
+                        <span className="badge">{b.partySize} st</span>
                       </div>
 
                       {/* 🎳 Banor */}
@@ -986,7 +1013,7 @@ const Admin = () => {
 
             <div className="admin-row admin-row-half admin-row-gap-md admin-row-top-md">
               <div className="admin-field">
-                <p>Tracks</p>
+                <p>Banor</p>
                 <input
                   type="number"
                   min="1"
@@ -1006,6 +1033,51 @@ const Admin = () => {
                 />
               </div>
             </div>
+            <div className="form-row">
+              <label>Tar aktiviteten betalt?</label>
+              <select
+                value={takesPayment ? "yes" : "no"}
+                onChange={(e) => setTakesPayment(e.target.value === "yes")}
+              >
+                <option value="yes">Ja (betald)</option>
+                <option value="no">Nej (gratis)</option>
+              </select>
+            </div>
+
+            <div className="form-row">
+              <label>Bokas / debiteras per</label>
+              <select
+                value={bookingUnit}
+                onChange={(e) => setBookingUnit(e.target.value)}
+              >
+                <option value="per_lane">Bana</option>
+                <option value="per_person">Person</option>
+              </select>
+            </div>
+
+            {bookingUnit === "per_person" && (
+              <div className="form-row" style={{ display: "flex", gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label>Min personer i sällskap</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={partyMin}
+                    onChange={(e) => setPartyMin(Number(e.target.value))}
+                  />
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <label>Max personer i sällskap</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={partyMax}
+                    onChange={(e) => setPartyMax(Number(e.target.value))}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="admin-row admin-row-half admin-row-gap-md admin-row-top-md">
               <div className="admin-field">

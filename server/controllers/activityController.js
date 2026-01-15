@@ -145,6 +145,9 @@ const createActivity = async (req, res) => {
       pricingRules,
       useWorkshopAvailability,
       availability,
+      takesPayment,
+      bookingUnit,
+      partyRules,
     } = req.body;
 
     if (!title) return res.status(400).json({ message: "title is required" });
@@ -155,6 +158,22 @@ const createActivity = async (req, res) => {
     if (!tracks) return res.status(400).json({ message: "tracks is required" });
     if (!workshopId)
       return res.status(400).json({ message: "workshopId is required" });
+
+    const unit = bookingUnit || "per_lane";
+    if (!["per_lane", "per_person"].includes(unit)) {
+      return res.status(400).json({
+        message: "bookingUnit must be per_lane|per_person",
+      });
+    }
+
+    const prMin = Number(partyRules?.min ?? 1);
+    const prMax = Number(partyRules?.max ?? 99);
+
+    if (prMin < 1 || prMax < 1 || prMin > prMax) {
+      return res.status(400).json({
+        message: "partyRules invalid (min>=1, max>=1, min<=max)",
+      });
+    }
 
     const ws = await Workshop.findById(workshopId).select("_id");
     if (!ws) {
@@ -168,6 +187,9 @@ const createActivity = async (req, res) => {
       information,
       imageUrl,
       tracks: Number(tracks),
+      takesPayment: takesPayment !== false && takesPayment !== "false",
+      bookingUnit: unit,
+      partyRules: { min: prMin, max: prMax },
       workshopId,
       bookingRules: bookingRules || undefined,
       pricingRules: pricingRules || undefined,
@@ -261,6 +283,11 @@ const listActivities = async (req, res) => {
       information: a.information,
       imageUrl: a.imageUrl,
       tracks: a.tracks,
+
+      takesPayment: a.takesPayment,
+      bookingUnit: a.bookingUnit,
+      partyRules: a.partyRules,
+
       bookingRules: a.bookingRules,
       pricingRules: a.pricingRules,
       useWorkshopAvailability: a.useWorkshopAvailability,
@@ -322,7 +349,7 @@ const getActivityAvailability = async (req, res) => {
       status: "active",
       startAt: { $lt: toStart },
       endAt: { $gt: fromStart },
-    }).select("startAt endAt");
+    }).select("startAt endAt partySize");
 
     const now = new Date();
     const leadMinutes = 0; // ändra till t.ex. 10 om du vill ha framförhållning
@@ -343,7 +370,13 @@ const getActivityAvailability = async (req, res) => {
 
         const taken = bookings.reduce((acc, b) => {
           const ov = b.startAt < slotEnd && slotStart < b.endAt;
-          return acc + (ov ? 1 : 0);
+          if (!ov) return acc;
+
+          // per_lane: 1 per bokning
+          // per_person: partySize per bokning
+          const inc = 1;
+
+          return acc + inc;
         }, 0);
 
         const availableTracks = Math.max(0, act.tracks - taken);

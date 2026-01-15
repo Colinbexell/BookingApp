@@ -25,6 +25,16 @@ const bookingSchema = new Schema(
     startAt: { type: Date, required: true, index: true },
     endAt: { type: Date, required: true, index: true },
     durationSlots: { type: Number, required: true }, // 1 eller 2
+    // Statistik & kapacitet
+    bookingUnit: {
+      type: String,
+      enum: ["per_lane", "per_person"],
+      default: "per_lane",
+      index: true,
+    },
+
+    // antal personer i sällskapet (alltid sparat för statistik)
+    partySize: { type: Number, default: 1 },
 
     // Status för bokning
     status: {
