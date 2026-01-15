@@ -134,28 +134,34 @@ const Home = () => {
       (b) => b.activityId === activityId
     );
 
-    // ✅ SPECIAL: partySize ska kunna skapa/uppdatera rad även om activity inte valts via amount1/amount2
+    // ✅ SPECIAL: partySize ska kunna vara 0 (= inte vald) för per_person
     if (field === "partySize") {
-      const nextPartySize = Math.min(
-        maxP,
-        Math.max(minP, Number(value || minP))
-      );
+      const raw = Number(value || 0);
+
+      // 0 => ta bort aktiviteten från kundvagnen (så den inte följer med “spöklikt”)
+      if (raw <= 0) {
+        if (existingIndex !== -1) {
+          const updated = [...bookData];
+          updated.splice(existingIndex, 1);
+          setBookData(updated);
+        }
+        return;
+      }
+
+      // Annars: clamp till [minP..maxP]
+      const nextPartySize = Math.min(maxP, Math.max(minP, raw));
 
       if (existingIndex !== -1) {
         const updated = [...bookData];
         const current = updated[existingIndex];
 
-        // per_person måste alltid ha minst 1 slot att välja tid för (annars kan man inte gå vidare)
-        const amount1 = isPerPerson
-          ? Math.max(1, Number(current.amount1 || 0))
-          : Number(current.amount1 || 0);
-        const amount2 = Number(current.amount2 || 0);
-
         const nextObj = {
           ...current,
           partySize: nextPartySize,
-          amount1,
-          amount2,
+          // ✅ viktigt: tvinga INTE amount1=1 här
+          // (vi sätter default i nextPage när man går vidare till tider)
+          amount1: Number(current.amount1 || 0),
+          amount2: Number(current.amount2 || 0),
         };
 
         const need = (nextObj.amount1 || 0) + (nextObj.amount2 || 0);
@@ -166,12 +172,12 @@ const Home = () => {
         return;
       }
 
-      // ✅ ingen rad ännu -> skapa en direkt
+      // ✅ ingen rad ännu -> skapa en direkt, men utan att auto-välja tider/count
       setBookData([
         ...bookData,
         {
           activityId,
-          amount1: isPerPerson ? 1 : 0,
+          amount1: 0,
           amount2: 0,
           selections: [],
           partySize: nextPartySize,
@@ -236,7 +242,7 @@ const Home = () => {
         amount1: 0,
         amount2: 0,
         selections: [],
-        partySize: 1,
+        partySize: 0,
       }
     );
   };
@@ -768,7 +774,7 @@ const Home = () => {
                             </p>
                           </div>
 
-                          <div className="need-box">
+                          {/* <div className="need-box">
                             <div className="need-item">
                               <span className="muted">Behöver 1h</span>
                               <strong>{Math.max(0, need1 - sel1)}</strong>
@@ -777,7 +783,7 @@ const Home = () => {
                               <span className="muted">Behöver 2h</span>
                               <strong>{Math.max(0, need2 - sel2)}</strong>
                             </div>
-                          </div>
+                          </div> */}
                         </div>
 
                         {slots.length === 0 ? (
@@ -955,7 +961,7 @@ const Home = () => {
                           </span>
                         </div>
 
-                        <div className="summary-metrics">
+                        {/* <div className="summary-metrics">
                           <div className="metric">
                             <span className="muted">1h</span>
                             <strong>
@@ -968,7 +974,7 @@ const Home = () => {
                               {sel2}/{need2}
                             </strong>
                           </div>
-                        </div>
+                        </div> */}
 
                         {(book.selections || []).length > 0 && (
                           <div className="selected-list">

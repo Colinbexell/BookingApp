@@ -34,29 +34,31 @@ const Activity = ({
                 className="c_button"
                 onClick={() => {
                   const minP = Number(partyRules?.min ?? 1);
-                  const next = Math.max(
-                    minP,
-                    Number(bookData.partySize || 1) - 1
-                  );
-                  updateBookData("partySize", next, id);
+                  const current = Number(bookData.partySize ?? 0);
 
-                  // ✅ per_person: en bana, så vi vill att man väljer tider (inte "antal banor")
-                  // Vi lämnar amount1/amount2 som de är (tider väljs i steg 2).
+                  // 0 => inget att ta bort
+                  if (current === 0) return;
+
+                  // om vi är på min (eller under pga edgecase) => tillbaka till 0 (då tas aktiviteten bort)
+                  const next = current <= minP ? 0 : current - 1;
+                  updateBookData("partySize", next, id);
                 }}
               >
                 -
               </div>
 
-              <p>{bookData.partySize || Number(partyRules?.min ?? 1)}</p>
+              <p>{Number(bookData.partySize ?? 0)}</p>
 
               <div
                 className="c_button"
                 onClick={() => {
+                  const minP = Number(partyRules?.min ?? 1);
                   const maxP = Number(partyRules?.max ?? 99);
-                  const next = Math.min(
-                    maxP,
-                    Number(bookData.partySize || 1) + 1
-                  );
+                  const current = Number(bookData.partySize ?? 0);
+
+                  // 0 -> hoppa direkt till min (så man slipper klicka 6 gånger)
+                  const next =
+                    current === 0 ? minP : Math.min(maxP, current + 1);
                   updateBookData("partySize", next, id);
                 }}
               >

@@ -73,24 +73,29 @@ const generateDaySlots = ({ dateISO, availability, slotMinutes }) => {
 
   if (!isValidHHMM(open) || !isValidHHMM(close)) return [];
 
-  const openMin = hhmmToMinutes(open);
-  const closeMin = hhmmToMinutes(close);
-  if (closeMin <= openMin) return [];
+  let openMin = hhmmToMinutes(open);
+  let closeMin = hhmmToMinutes(close);
+
+  // ✅ NYTT: om close är "mindre" än open => öppet över midnatt
+  if (closeMin <= openMin) {
+    closeMin += 24 * 60; // flytta stängning till nästa dygn
+  }
+
+  const base = makeLocalDate(dateISO, "00:00");
 
   const slots = [];
   for (let t = openMin; t + slotMinutes <= closeMin; t += slotMinutes) {
-    const startHHMM = minutesToHHMM(t);
-    const endHHMM = minutesToHHMM(t + slotMinutes);
-
-    const startLocal = makeLocalDate(dateISO, startHHMM);
-    const endLocal = makeLocalDate(dateISO, endHHMM);
+    const startLocal = addMinutes(base, t);
+    const endLocal = addMinutes(base, t + slotMinutes);
 
     slots.push({
-      dateISO,
+      // ✅ NYTT: slotten kan hamna på "nästa dag", så vi sätter dateISO efter starttiden
+      dateISO: toISODate(startLocal),
       startISO: startLocal.toISOString(),
       endISO: endLocal.toISOString(),
     });
   }
+
   return slots;
 };
 
