@@ -14,6 +14,22 @@ axios.defaults.withCredentials = true;
 
 const dayNames = ["Sön", "Mån", "Tis", "Ons", "Tor", "Fre", "Lör"];
 
+const pad2 = (n) => String(n).padStart(2, "0");
+
+const toISODateLocal = (date) => {
+  const y = date.getFullYear();
+  const m = pad2(date.getMonth() + 1);
+  const d = pad2(date.getDate());
+  return `${y}-${m}-${d}`;
+};
+
+const addDaysISO = (isoDate, days) => {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + days);
+  return toISODateLocal(dt);
+};
+
 const Admin = () => {
   const [user] = useState(() => JSON.parse(localStorage.getItem("userData")));
   const workshopId = user?.workshopId;
@@ -35,16 +51,14 @@ const Admin = () => {
   const [exceptions, setExceptions] = useState([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
 
-  // Filter för bokningar
-  const [fromDate, setFromDate] = useState(() =>
-    new Date().toISOString().slice(0, 10)
+  // Filter för bokningar (1 datum = "business day")
+  const [selectedDate, setSelectedDate] = useState(() =>
+    toISODateLocal(new Date())
   );
-  const [toDate, setToDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().slice(0, 10);
-  });
+
   const [bookingSearch, setBookingSearch] = useState("");
+  const [bookingActivityFilter, setBookingActivityFilter] = useState("all"); // activityId | "all"
+  const [bookingSort, setBookingSort] = useState("asc"); // "asc" = närmast först, "desc" = tvärtom
 
   // Avboknings Popup
   const [cancelPopupOpen, setCancelPopupOpen] = useState(false);
@@ -278,12 +292,76 @@ const Admin = () => {
   // --- Load bookings (workshop) ---
   const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
+  const timeToMinutes = (hhmm) => {
+    if (!hhmm || typeof hhmm !== "string") return null;
+    const [h, m] = hhmm.split(":").map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
+  };
+
+  const makeLocalDateTime = (isoDate, hhmm) => {
+    const [y, m, d] = isoDate.split("-").map(Number);
+    const [hh, mm] = hhmm.split(":").map(Number);
+    return new Date(y, m - 1, d, hh, mm, 0, 0);
+  };
+
+  // Tar fram "öppet fönster" för valt datum, och hanterar t.ex. 13:00–03:00.
+  const getBusinessWindow = (isoDate) => {
+    // 1) Exception för datum?
+    const ex = exceptions.find((x) => x.date === isoDate);
+
+    if (ex?.closed) {
+      // Stängt hela dagen -> inget fönster
+      return { startMs: null, endMs: null, isClosed: true };
+    }
+
+    let open = ex?.open || null;
+    let close = ex?.close || null;
+
+    // 2) Om ingen exception -> weekly för veckodagen
+    if (!open || !close) {
+      const [y, m, d] = isoDate.split("-").map(Number);
+      const day = new Date(y, m - 1, d).getDay(); // 0-6
+      const w = weekly.find((x) => x.day === day);
+
+      // ✅ om dagen inte finns i weekly: anta hel dag så admin kan se bokningar ändå
+      if (!w) {
+        const start = makeLocalDateTime(isoDate, "00:00");
+        const end = makeLocalDateTime(addDaysISO(isoDate, 1), "00:00");
+        return {
+          startMs: start.getTime(),
+          endMs: end.getTime(),
+          isClosed: false,
+        };
+      }
+
+      open = w.open;
+      close = w.close;
+    }
+
+    const openMin = timeToMinutes(open);
+    const closeMin = timeToMinutes(close);
+    if (openMin == null || closeMin == null) {
+      return { startMs: null, endMs: null, isClosed: false };
+    }
+
+    const start = makeLocalDateTime(isoDate, open);
+
+    // Om close <= open => passet går över midnatt (ex 13–03)
+    const endDate = closeMin <= openMin ? addDaysISO(isoDate, 1) : isoDate;
+    const end = makeLocalDateTime(endDate, close);
+
+    return { startMs: start.getTime(), endMs: end.getTime(), isClosed: false };
+  };
+
   const loadBookings = async () => {
     if (!workshopId) return;
 
     try {
+      const to = addDaysISO(selectedDate, 1);
+
       const res = await axios.get(
-        `/booking/workshop/${workshopId}?from=${fromDate}&to=${toDate}`
+        `/booking/workshop/${workshopId}?from=${selectedDate}&to=${to}`
       );
 
       const normalized = (res.data.bookings || []).map((b) => {
@@ -296,6 +374,7 @@ const Admin = () => {
           partySize: Number(b.partySize ?? 1),
 
           // 🔥 AKTIVITET
+          activityId: b.activityId || b.activity?._id || b.activity?.id || "",
           activityTitle:
             b.activityTitle || b.activity?.title || "Okänd aktivitet",
 
@@ -349,7 +428,10 @@ const Admin = () => {
   useEffect(() => {
     if (!canUseAdmin) return;
 
-    if (page === 1) loadBookings();
+    if (page === 1) {
+      loadWorkshopAvailability();
+      loadBookings();
+    }
     if (page === 2) loadActivities();
     if (page === 3) loadWorkshopAvailability();
   }, [page, canUseAdmin]);
@@ -455,16 +537,63 @@ const Admin = () => {
 
   const filteredBookings = useMemo(() => {
     const q = bookingSearch.trim().toLowerCase();
-    if (!q) return bookings;
 
-    return bookings.filter((b) => {
-      return (
-        (b.customerName || "").toLowerCase().includes(q) ||
-        (b.email || "").toLowerCase().includes(q) ||
-        (b.phone || "").toLowerCase().includes(q)
-      );
-    });
-  }, [bookings, bookingSearch]);
+    const now = Date.now();
+    const graceMs = 5 * 60 * 1000; // 5 minuter
+
+    const { startMs, endMs, isClosed } = getBusinessWindow(selectedDate);
+    if (isClosed) return [];
+
+    const list = bookings
+      // ✅ Visa bara bokningar som tillhör vald "business day"
+      .filter((b) => {
+        const start = new Date(b.startAt).getTime();
+        if (startMs != null && start < startMs) return false;
+        if (endMs != null && start >= endMs) return false;
+        return true;
+      })
+      // ✅ Visa bara bokningar som inte har “löpt ut” (endAt + 5 min) – men bara för idag
+      .filter((b) => {
+        const todayISO = new Date().toISOString().slice(0, 10);
+        const isToday = selectedDate === todayISO;
+
+        if (!isToday) return true; // ✅ om du kollar annan dag: visa bokningarna ändå
+
+        const endMsLocal = new Date(b.endAt).getTime();
+        return endMsLocal + graceMs > now;
+      })
+
+      // ✅ filter: aktivitet (default = all)
+      .filter((b) => {
+        if (bookingActivityFilter === "all") return true;
+        return b.activityId === bookingActivityFilter;
+      })
+      // ✅ sök
+      .filter((b) => {
+        if (!q) return true;
+        return (
+          (b.customerName || "").toLowerCase().includes(q) ||
+          (b.email || "").toLowerCase().includes(q) ||
+          (b.phone || "").toLowerCase().includes(q)
+        );
+      })
+      // ✅ sort: närmast först (asc) eller tvärtom (desc)
+      .sort((a, b) => {
+        const aStart = new Date(a.startAt).getTime();
+        const bStart = new Date(b.startAt).getTime();
+        return bookingSort === "asc" ? aStart - bStart : bStart - aStart;
+      });
+
+    return list;
+  }, [
+    bookings,
+    bookingSearch,
+    bookingActivityFilter,
+    bookingSort,
+    selectedDate,
+    weekly,
+    exceptions,
+  ]);
 
   // --- UI pages ---
   const renderBookings = () => {
@@ -478,6 +607,31 @@ const Admin = () => {
               </div>
 
               <div className="bookings-controls">
+                {/* 🎯 Aktivitet-filter */}
+                <select
+                  className="booking-select"
+                  value={bookingActivityFilter}
+                  onChange={(e) => setBookingActivityFilter(e.target.value)}
+                >
+                  <option value="all">Alla aktiviteter</option>
+                  {activities.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.title}
+                    </option>
+                  ))}
+                </select>
+
+                {/* ↕️ Sortering */}
+                <select
+                  className="booking-select"
+                  value={bookingSort}
+                  onChange={(e) => setBookingSort(e.target.value)}
+                >
+                  <option value="asc">Närmast tid först</option>
+                  <option value="desc">Senast tid först</option>
+                </select>
+
+                {/* 🔎 Sök */}
                 <input
                   className="booking-search"
                   type="text"
@@ -485,16 +639,13 @@ const Admin = () => {
                   value={bookingSearch}
                   onChange={(e) => setBookingSearch(e.target.value)}
                 />
+
                 <input
                   type="date"
-                  value={fromDate}
-                  onChange={(e) => setFromDate(e.target.value)}
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
                 />
-                <input
-                  type="date"
-                  value={toDate}
-                  onChange={(e) => setToDate(e.target.value)}
-                />
+
                 <button className="admin-btn secondary" onClick={loadBookings}>
                   Uppdatera
                 </button>
@@ -513,9 +664,9 @@ const Admin = () => {
                 <div>Status</div>
               </div>
 
-              {bookings.length === 0 ? (
+              {filteredBookings.length === 0 ? (
                 <div className="empty-state">
-                  Inga bokningar i valt intervall.
+                  Inga bokningar för valt datum.
                 </div>
               ) : (
                 filteredBookings.map((b) => {
