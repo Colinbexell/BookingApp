@@ -545,7 +545,7 @@
 
 .bookings-row {
   display: grid;
-  grid-template-columns: 1.2fr 1.2fr 1.6fr 0.6fr 0.6fr 0.8fr 1fr 0.8fr 0.7fr;
+  grid-template-columns: 1.2fr 1.2fr 1.6fr 0.6fr 0.6fr 0.8fr 1fr 0.8fr;
   gap: 12px;
   align-items: center;
 
@@ -740,4 +740,69 @@
   border-left: 2px solid var(--primary);
   border-right: 2px solid var(--primary);
   border-top: 2px solid var(--primary);
+}
+
+/* -----------------------------
+   Booking modal (details)
+------------------------------ */
+.booking-modal {
+  width: min(720px, 92vw);
+  border-radius: 18px;
+  background: white;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18);
+  padding: 16px;
+  cursor: default;
+}
+
+.booking-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.booking-modal-title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.booking-modal-sub {
+  margin: 6px 0 0 0;
+  opacity: 0.75;
+  font-size: 13px;
+}
+
+.booking-modal-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.booking-field {
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 10px 12px;
+}
+
+.booking-label {
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.65;
+  margin-bottom: 6px;
+}
+
+.booking-value {
+  font-weight: 800;
+  opacity: 0.92;
+  word-break: break-word;
+}
+
+.booking-modal-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }

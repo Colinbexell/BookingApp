@@ -372,8 +372,36 @@ const cancelBookings = async (req, res) => {
   }
 };
 
+// --------------------
+// PATCH /booking/mark-paid
+// Body: { bookingIds: [ObjectId] }
+// Markerar bokningar som betalda (t.ex. "betald på plats")
+// --------------------
+const markBookingsPaid = async (req, res) => {
+  try {
+    const { bookingIds } = req.body;
+
+    if (!Array.isArray(bookingIds) || bookingIds.length === 0) {
+      return res.status(400).json({ ok: false, message: "bookingIds krävs" });
+    }
+
+    const ids = bookingIds.map((id) => new mongoose.Types.ObjectId(id));
+
+    // Markera bara aktiva bokningar som betalda
+    const result = await Booking.updateMany(
+      { _id: { $in: ids }, status: "active" },
+      { $set: { paymentStatus: "paid" } }
+    );
+
+    return res.json({ ok: true, modified: result.modifiedCount });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+};
+
 module.exports = {
   createBooking,
   listBookingsForWorkshop,
   cancelBookings,
+  markBookingsPaid,
 };

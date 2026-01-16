@@ -6,6 +6,7 @@ const {
   createBooking,
   listBookingsForWorkshop,
   cancelBookings,
+  markBookingsPaid,
 } = require("../controllers/bookingController");
 
 router.use(
@@ -18,5 +19,6 @@ router.use(
 router.post("/create", createBooking);
 router.get("/workshop/:workshopId", listBookingsForWorkshop);
 router.patch("/cancel", cancelBookings);
+router.patch("/mark-paid", markBookingsPaid);
 
 module.exports = router;

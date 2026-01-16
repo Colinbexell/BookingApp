@@ -51,6 +51,13 @@ const Admin = () => {
   const [cancelTarget, setCancelTarget] = useState(null); // booking-raden
   const [isCancelling, setIsCancelling] = useState(false);
 
+  // Bokningsdetaljer + betalningsverifiering
+  const [bookingPopupOpen, setBookingPopupOpen] = useState(false);
+  const [bookingTarget, setBookingTarget] = useState(null);
+
+  const [verifyPopupOpen, setVerifyPopupOpen] = useState(false);
+  const [isMarkingPaid, setIsMarkingPaid] = useState(false);
+
   // Popup skapa aktivitet
   const [newActPopupVisible, setNewActPopupVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -219,6 +226,41 @@ const Admin = () => {
       toast.error(e?.response?.data?.message || "Kunde inte avboka");
     } finally {
       setIsCancelling(false);
+    }
+  };
+
+  // Öppna bokningsdetaljer (och ev. markera som betald på plats)
+  const openBookingPopup = (b) => {
+    setBookingTarget(b);
+    setBookingPopupOpen(true);
+  };
+
+  const requestMarkPaid = () => {
+    if (!bookingTarget) return;
+    setVerifyPopupOpen(true);
+  };
+
+  const confirmMarkPaid = async () => {
+    if (!bookingTarget) return;
+
+    try {
+      setIsMarkingPaid(true);
+
+      await axios.patch("/booking/mark-paid", {
+        bookingIds: bookingTarget.bookingIds,
+      });
+
+      toast.success("Markerad som betald ✅");
+      setVerifyPopupOpen(false);
+      setBookingPopupOpen(false);
+      setBookingTarget(null);
+      loadBookings();
+    } catch (e) {
+      toast.error(
+        e?.response?.data?.message || "Kunde inte markera som betald"
+      );
+    } finally {
+      setIsMarkingPaid(false);
     }
   };
 
@@ -469,7 +511,6 @@ const Admin = () => {
                 <div>Pris</div>
                 <div>Betalning</div>
                 <div>Status</div>
-                <div>Åtgärd</div>
               </div>
 
               {bookings.length === 0 ? (
@@ -495,13 +536,20 @@ const Admin = () => {
 
                   const paymentLabel =
                     b.paymentStatus === "paid"
-                      ? "Betald"
+                      ? b.paymentMethod === "onsite"
+                        ? "Betald (på plats)"
+                        : "Betald (online)"
                       : b.paymentMethod === "onsite"
                       ? "Obetald (på plats)"
                       : "Obetald";
 
                   return (
-                    <div key={b.id} className="bookings-row">
+                    <div
+                      key={b.id}
+                      className="bookings-row"
+                      onClick={() => openBookingPopup(b)}
+                      style={{ cursor: "pointer" }}
+                    >
                       {/* 👤 Namn */}
                       <div>
                         <strong>{b.customerName}</strong>
@@ -559,16 +607,6 @@ const Admin = () => {
                         >
                           {b.status === "active" ? "Aktiv" : "Avbokad"}
                         </span>
-                      </div>
-                      <div className="booking-actions">
-                        <button
-                          className="admin-btn danger small"
-                          onClick={() => cancelBookingRow(b)}
-                          disabled={b.status !== "active"}
-                          title="Avboka"
-                        >
-                          Avboka
-                        </button>
                       </div>
                     </div>
                   );
@@ -1156,6 +1194,228 @@ const Admin = () => {
                   : isSubmitting
                   ? "Skapar..."
                   : "Skapa aktivitet"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Bokningsdetaljer */}
+      {bookingPopupOpen ? (
+        <div
+          className="popup"
+          onClick={() => {
+            if (isMarkingPaid) return;
+            setBookingPopupOpen(false);
+            setBookingTarget(null);
+          }}
+        >
+          <div className="booking-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="booking-modal-head">
+              <div>
+                <h2 className="booking-modal-title">Bokning</h2>
+                <p className="booking-modal-sub">
+                  Bokningsreferens: <strong>{bookingTarget?.id}</strong>
+                </p>
+              </div>
+
+              <button
+                className="admin-btn secondary small"
+                onClick={() => {
+                  if (isMarkingPaid) return;
+                  setBookingPopupOpen(false);
+                  setBookingTarget(null);
+                }}
+              >
+                Stäng
+              </button>
+            </div>
+
+            <div className="booking-modal-grid">
+              <div className="booking-field">
+                <div className="booking-label">Kund</div>
+                <div className="booking-value">
+                  {bookingTarget?.customerName}
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Telefonnummer</div>
+                <div className="booking-value">{bookingTarget?.phone}</div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">E-post</div>
+                <div className="booking-value">{bookingTarget?.email}</div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Aktivitet</div>
+                <div className="booking-value">
+                  {bookingTarget?.activityTitle}
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Tid</div>
+                <div className="booking-value">
+                  {bookingTarget?.startAt
+                    ? new Date(bookingTarget.startAt).toLocaleString("sv-SE", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "2-digit",
+                        day: "2-digit",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })
+                    : ""}
+                  {bookingTarget?.endAt
+                    ? ` – ${new Date(bookingTarget.endAt).toLocaleTimeString(
+                        "sv-SE",
+                        {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }
+                      )}`
+                    : ""}
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Sällskap</div>
+                <div className="booking-value">
+                  {bookingTarget?.partySize} st
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Banor</div>
+                <div className="booking-value">
+                  {bookingTarget?.quantity} st
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Pris</div>
+                <div className="booking-value">
+                  {Math.round(bookingTarget?.totalPrice || 0)}{" "}
+                  {bookingTarget?.currency || "SEK"}
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Betalning</div>
+                <div className="booking-value">
+                  <span
+                    className={`status-pill ${
+                      bookingTarget?.paymentStatus === "paid"
+                        ? "paid"
+                        : "unpaid"
+                    }`}
+                  >
+                    {bookingTarget?.paymentStatus === "paid"
+                      ? bookingTarget?.paymentMethod === "onsite"
+                        ? "Betald (på plats)"
+                        : "Betald (online)"
+                      : bookingTarget?.paymentMethod === "onsite"
+                      ? "Obetald (på plats)"
+                      : "Obetald"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Status</div>
+                <div className="booking-value">
+                  <span
+                    className={`status-pill ${
+                      bookingTarget?.status === "active" ? "ok" : "bad"
+                    }`}
+                  >
+                    {bookingTarget?.status === "active" ? "Aktiv" : "Avbokad"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="booking-modal-actions">
+              {bookingTarget?.status === "active" ? (
+                <button
+                  className="admin-btn danger"
+                  onClick={() => {
+                    setBookingPopupOpen(false);
+                    setCancelTarget(bookingTarget);
+                    setCancelPopupOpen(true);
+                  }}
+                >
+                  Avboka bokning
+                </button>
+              ) : null}
+
+              {bookingTarget?.status === "active" &&
+              bookingTarget?.paymentMethod === "onsite" &&
+              bookingTarget?.paymentStatus !== "paid" ? (
+                <button
+                  className="admin-btn"
+                  onClick={requestMarkPaid}
+                  disabled={isMarkingPaid}
+                >
+                  Markera som betald
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Confirm: verifiera betalning */}
+      {verifyPopupOpen ? (
+        <div
+          className="popup"
+          onClick={() => {
+            if (isMarkingPaid) return;
+            setVerifyPopupOpen(false);
+          }}
+        >
+          <div className="confirm-window" onClick={(e) => e.stopPropagation()}>
+            <div className="confirm-top">
+              <div className="confirm-icon">!</div>
+              <div>
+                <h2 className="confirm-title">Verifiera betalning</h2>
+                <p className="confirm-sub">
+                  Är du säker att du vill verifiera att{" "}
+                  <strong>{bookingTarget?.customerName}</strong> har betalat på
+                  plats?
+                </p>
+              </div>
+            </div>
+
+            <div className="confirm-details">
+              <div className="confirm-chip">{bookingTarget?.activityTitle}</div>
+              <div className="confirm-chip">
+                {Math.round(bookingTarget?.totalPrice || 0)}{" "}
+                {bookingTarget?.currency || "SEK"}
+              </div>
+              <div className="confirm-chip">Ref: {bookingTarget?.id}</div>
+            </div>
+
+            <div className="confirm-actions">
+              <button
+                className="admin-btn secondary"
+                onClick={() => {
+                  if (isMarkingPaid) return;
+                  setVerifyPopupOpen(false);
+                }}
+              >
+                Nej, stäng
+              </button>
+
+              <button
+                className="admin-btn"
+                onClick={confirmMarkPaid}
+                disabled={isMarkingPaid}
+              >
+                {isMarkingPaid ? "Verifierar..." : "Ja, verifiera"}
               </button>
             </div>
           </div>
