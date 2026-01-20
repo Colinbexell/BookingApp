@@ -52,6 +52,11 @@ const Home = () => {
 
   // payment (page 4)
   const [paymentMethod, setPaymentMethod] = useState("onsite"); // onsite | online
+  const [paymentOptions, setPaymentOptions] = useState({
+    allowOnsite: true,
+    allowOnline: true,
+  });
+  const [loadingPaymentOptions, setLoadingPaymentOptions] = useState(false);
 
   // activities from API
   const [activities, setActivities] = useState([]);
@@ -113,10 +118,45 @@ const Home = () => {
     }
   };
 
+  const loadWorkshopSettings = async () => {
+    if (!workshopId) return;
+
+    try {
+      setLoadingPaymentOptions(true);
+      const res = await axios.get(`/workshop/${workshopId}/settings`);
+      const opts = res.data?.paymentOptions || {
+        allowOnsite: true,
+        allowOnline: true,
+      };
+
+      setPaymentOptions({
+        allowOnsite: opts.allowOnsite !== false,
+        allowOnline: opts.allowOnline !== false,
+      });
+    } catch {
+      // fallback: visa båda om settings inte finns ännu
+      setPaymentOptions({ allowOnsite: true, allowOnline: true });
+    } finally {
+      setLoadingPaymentOptions(false);
+    }
+  };
+
   useEffect(() => {
     loadActivities();
+    loadWorkshopSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workshopId]);
+
+  useEffect(() => {
+    // Om nuvarande val inte är tillåtet -> välj första tillåtna
+    if (paymentMethod === "onsite" && !paymentOptions.allowOnsite) {
+      setPaymentMethod(paymentOptions.allowOnline ? "online" : "onsite");
+    }
+    if (paymentMethod === "online" && !paymentOptions.allowOnline) {
+      setPaymentMethod(paymentOptions.allowOnsite ? "onsite" : "online");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentOptions.allowOnsite, paymentOptions.allowOnline]);
 
   // --------------------
   // Cart helpers
@@ -131,7 +171,7 @@ const Home = () => {
     const maxP = Number(act?.partyRules?.max ?? 99);
 
     const existingIndex = bookData.findIndex(
-      (b) => b.activityId === activityId
+      (b) => b.activityId === activityId,
     );
 
     // ✅ SPECIAL: partySize ska kunna vara 0 (= inte vald) för per_person
@@ -288,7 +328,7 @@ const Home = () => {
           calcSelectionPrice(
             booking.activityId,
             sel.startISO,
-            sel.durationSlots
+            sel.durationSlots,
           )
         );
       }, 0);
@@ -327,10 +367,10 @@ const Home = () => {
       const results = await Promise.all(
         uniqueIds.map(async (id) => {
           const res = await axios.get(
-            `/activity/${id}/availability?from=${from}&to=${to}`
+            `/activity/${id}/availability?from=${from}&to=${to}`,
           );
           return [id, res.data];
-        })
+        }),
       );
 
       const next = {};
@@ -383,7 +423,7 @@ const Home = () => {
   const isTwoHourStart = (activityId, startISO) => {
     const b = getActivityBookData(activityId);
     return (b.selections || []).some(
-      (sel) => sel.startISO === startISO && sel.durationSlots === 2
+      (sel) => sel.startISO === startISO && sel.durationSlots === 2,
     );
   };
 
@@ -400,7 +440,7 @@ const Home = () => {
     if (!prev) return false;
 
     return (b.selections || []).some(
-      (sel) => sel.durationSlots === 2 && sel.startISO === prev.startISO
+      (sel) => sel.durationSlots === 2 && sel.startISO === prev.startISO,
     );
   };
 
@@ -435,11 +475,11 @@ const Home = () => {
       const usedInCart = takenCountInCartForSlot(
         activityId,
         slot.startISO,
-        slotMinutes
+        slotMinutes,
       );
       const effectiveAvailable = Math.max(
         0,
-        (slot.availableTracks || 0) - usedInCart
+        (slot.availableTracks || 0) - usedInCart,
       );
 
       if (effectiveAvailable <= 0) return false;
@@ -477,7 +517,7 @@ const Home = () => {
           ...b,
           selections: [...selections, { startISO, durationSlots }],
         };
-      })
+      }),
     );
   };
 
@@ -489,8 +529,8 @@ const Home = () => {
               ...b,
               selections: (b.selections || []).filter((_, i) => i !== index),
             }
-          : b
-      )
+          : b,
+      ),
     );
   };
 
@@ -522,7 +562,7 @@ const Home = () => {
             return { ...b, amount1: 1, amount2: 0 };
           }
           return b;
-        })
+        }),
       );
 
       setPage(2);
@@ -559,7 +599,7 @@ const Home = () => {
 
           if (ps < minP || ps > maxP) {
             toast.error(
-              `${act.title}: sällskap måste vara mellan ${minP} och ${maxP}`
+              `${act.title}: sällskap måste vara mellan ${minP} och ${maxP}`,
             );
             return;
           }
@@ -595,7 +635,7 @@ const Home = () => {
           paymentMethod, // onsite | online
 
           partySize: Number(b.partySize || 1),
-        }))
+        })),
       );
 
       if (payload.length === 0) {
@@ -604,7 +644,7 @@ const Home = () => {
       }
 
       const results = await Promise.allSettled(
-        payload.map((p) => axios.post("/booking/create", p))
+        payload.map((p) => axios.post("/booking/create", p)),
       );
       const failed = results.filter((r) => r.status === "rejected");
 
@@ -618,7 +658,7 @@ const Home = () => {
 
         if (status === 409) {
           toast.error(
-            "Minst en bokning misslyckades (någon hann boka före). Uppdatera tider."
+            "Minst en bokning misslyckades (någon hann boka före). Uppdatera tider.",
           );
           await loadAvailabilityForSelected();
           return;
@@ -682,7 +722,7 @@ const Home = () => {
 
       case 2: {
         const selected = bookData.filter(
-          (b) => (b.amount1 || 0) > 0 || (b.amount2 || 0) > 0
+          (b) => (b.amount1 || 0) > 0 || (b.amount2 || 0) > 0,
         );
 
         return (
@@ -752,7 +792,7 @@ const Home = () => {
                 ) : (
                   selected.map((b) => {
                     const activity = activities.find(
-                      (a) => a.id === b.activityId
+                      (a) => a.id === b.activityId,
                     );
                     if (!activity) return null;
 
@@ -796,7 +836,7 @@ const Home = () => {
                               const usedInCart = takenCountInCartForSlot(
                                 activity.id,
                                 slot.startISO,
-                                av?.slotMinutes || 60
+                                av?.slotMinutes || 60,
                               );
 
                               const basePrice1 = Number(slot.slotPrice || 0);
@@ -816,10 +856,10 @@ const Home = () => {
                                   : 1;
 
                               const price1 = Math.round(
-                                basePrice1 * multiplier
+                                basePrice1 * multiplier,
                               );
                               const price2 = Math.round(
-                                basePrice2 * multiplier
+                                basePrice2 * multiplier,
                               );
 
                               const covered = getCoveredStartISOs(activity.id);
@@ -827,16 +867,16 @@ const Home = () => {
 
                               const isStart2h = isTwoHourStart(
                                 activity.id,
-                                slot.startISO
+                                slot.startISO,
                               );
                               const isTail2h = isTwoHourTail(
                                 activity.id,
-                                slot.startISO
+                                slot.startISO,
                               );
 
                               const left = Math.max(
                                 0,
-                                (slot.availableTracks || 0) - usedInCart
+                                (slot.availableTracks || 0) - usedInCart,
                               );
 
                               const can1 =
@@ -845,7 +885,7 @@ const Home = () => {
                                 needMore2 && canPickStart(activity.id, idx, 2);
 
                               const timeLabel = new Date(
-                                slot.startISO
+                                slot.startISO,
                               ).toLocaleTimeString("sv-SE", {
                                 hour: "2-digit",
                                 minute: "2-digit",
@@ -855,8 +895,8 @@ const Home = () => {
                                 left === 0
                                   ? "chip chip-red"
                                   : left === 1
-                                  ? "chip chip-yellow"
-                                  : "chip chip-green";
+                                    ? "chip chip-yellow"
+                                    : "chip chip-green";
 
                               return (
                                 <div
@@ -945,7 +985,7 @@ const Home = () => {
                 <div className="summary-list">
                   {selected.map((book) => {
                     const activity = activities.find(
-                      (a) => a.id === book.activityId
+                      (a) => a.id === book.activityId,
                     );
                     if (!activity) return null;
 
@@ -993,7 +1033,7 @@ const Home = () => {
                                         day: "2-digit",
                                         hour: "2-digit",
                                         minute: "2-digit",
-                                      }
+                                      },
                                     )}
                                   </div>
                                   <div className="muted">
@@ -1004,7 +1044,7 @@ const Home = () => {
                                   {calcSelectionPrice(
                                     book.activityId,
                                     sel.startISO,
-                                    sel.durationSlots
+                                    sel.durationSlots,
                                   ).toFixed(0)}{" "}
                                   kr
                                 </div>
@@ -1123,7 +1163,7 @@ const Home = () => {
 
                       {bookData.map((b) => {
                         const act = activities.find(
-                          (a) => a.id === b.activityId
+                          (a) => a.id === b.activityId,
                         );
                         if (!act) return null;
 
@@ -1163,8 +1203,8 @@ const Home = () => {
                                   prev.map((x) =>
                                     x.activityId === b.activityId
                                       ? { ...x, partySize: v }
-                                      : x
-                                  )
+                                      : x,
+                                  ),
                                 );
                               }}
                               style={{ width: "100%" }}
@@ -1235,33 +1275,47 @@ const Home = () => {
                 </div>
 
                 <div className="payment-grid">
-                  <button
-                    className={`pay-option ${
-                      paymentMethod === "onsite" ? "active" : ""
-                    }`}
-                    onClick={() => setPaymentMethod("onsite")}
-                    type="button"
-                  >
-                    <div className="pay-title">Betala på plats</div>
-                    <div className="pay-desc muted">
-                      Markeras som <strong>Obetald</strong> i admin tills
-                      personalen tar betalt.
-                    </div>
-                  </button>
+                  {loadingPaymentOptions ? (
+                    <p className="muted">Laddar betalsätt...</p>
+                  ) : (
+                    <>
+                      {paymentOptions.allowOnsite && (
+                        <button
+                          className={`pay-option ${paymentMethod === "onsite" ? "active" : ""}`}
+                          onClick={() => setPaymentMethod("onsite")}
+                          type="button"
+                        >
+                          <div className="pay-title">Betala på plats</div>
+                          <div className="pay-desc muted">
+                            Markeras som <strong>Obetald</strong> i admin tills
+                            personalen tar betalt.
+                          </div>
+                        </button>
+                      )}
 
-                  <button
-                    className={`pay-option ${
-                      paymentMethod === "online" ? "active" : ""
-                    }`}
-                    onClick={() => setPaymentMethod("online")}
-                    type="button"
-                  >
-                    <div className="pay-title">Betala direkt</div>
-                    <div className="pay-desc muted">
-                      Markeras som <strong>Betald</strong>. (Koppla Stripe
-                      senare.)
-                    </div>
-                  </button>
+                      {paymentOptions.allowOnline && (
+                        <button
+                          className={`pay-option ${paymentMethod === "online" ? "active" : ""}`}
+                          onClick={() => setPaymentMethod("online")}
+                          type="button"
+                        >
+                          <div className="pay-title">Betala direkt</div>
+                          <div className="pay-desc muted">
+                            Markeras som <strong>Betald</strong>. (Koppla Stripe
+                            senare.)
+                          </div>
+                        </button>
+                      )}
+
+                      {!paymentOptions.allowOnsite &&
+                        !paymentOptions.allowOnline && (
+                          <div className="empty-state">
+                            Inga betalsätt är aktiverade för denna workshop.
+                            Kontakta företaget.
+                          </div>
+                        )}
+                    </>
+                  )}
                 </div>
 
                 <div className="summary-footer">

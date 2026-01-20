@@ -7,7 +7,7 @@ const weeklyAvailabilitySchema = new Schema(
     open: { type: String, required: true }, // "13:00"
     close: { type: String, required: true }, // "17:00"
   },
-  { _id: false }
+  { _id: false },
 );
 
 const exceptionSchema = new Schema(
@@ -18,7 +18,7 @@ const exceptionSchema = new Schema(
     close: String,
     reason: String,
   },
-  { _id: false }
+  { _id: false },
 );
 
 const workshopSchema = new Schema(
@@ -36,8 +36,12 @@ const workshopSchema = new Schema(
         default: [],
       },
     },
+    paymentOptions: {
+      allowOnsite: { type: Boolean, default: true },
+      allowOnline: { type: Boolean, default: true },
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 const WorkshopModel = mongoose.model("Workshop", workshopSchema);

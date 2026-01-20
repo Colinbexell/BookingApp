@@ -128,9 +128,74 @@ const updateWorkshopAvailability = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/workshop/:id/settings
+ * return: { paymentOptions }
+ */
+const getWorkshopSettings = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const workshop = await Workshop.findById(id).select("paymentOptions");
+    if (!workshop)
+      return res.status(404).json({ message: "Workshop not found" });
+
+    return res.json({
+      ok: true,
+      paymentOptions: workshop.paymentOptions || {
+        allowOnsite: true,
+        allowOnline: true,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+};
+
+/**
+ * PATCH /api/workshop/:id/settings
+ * body: { paymentOptions: { allowOnsite, allowOnline } }
+ */
+const updateWorkshopSettings = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const { paymentOptions } = req.body;
+
+    const workshop = await Workshop.findById(id);
+    if (!workshop)
+      return res.status(404).json({ message: "Workshop not found" });
+
+    const allowOnsite =
+      paymentOptions?.allowOnsite === undefined
+        ? (workshop.paymentOptions?.allowOnsite ?? true)
+        : !!paymentOptions.allowOnsite;
+
+    const allowOnline =
+      paymentOptions?.allowOnline === undefined
+        ? (workshop.paymentOptions?.allowOnline ?? true)
+        : !!paymentOptions.allowOnline;
+
+    // Stoppa att båda blir false (annars kan ingen betala)
+    if (!allowOnsite && !allowOnline) {
+      return res.status(400).json({
+        message: "Minst ett betalsätt måste vara aktivt",
+      });
+    }
+
+    workshop.paymentOptions = { allowOnsite, allowOnline };
+    await workshop.save();
+
+    return res.json({ ok: true, paymentOptions: workshop.paymentOptions });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+};
+
 module.exports = {
   createWorkshop,
   getWorkshopName,
   getWorkshopAvailability,
   updateWorkshopAvailability,
+  getWorkshopSettings,
+  updateWorkshopSettings,
 };

@@ -51,9 +51,15 @@ const Admin = () => {
   const [exceptions, setExceptions] = useState([]);
   const [calendarLoading, setCalendarLoading] = useState(false);
 
+  const [paymentOptions, setPaymentOptions] = useState({
+    allowOnsite: true,
+    allowOnline: true,
+  });
+  const [paymentLoading, setPaymentLoading] = useState(false);
+
   // Filter för bokningar (1 datum = "business day")
   const [selectedDate, setSelectedDate] = useState(() =>
-    toISODateLocal(new Date())
+    toISODateLocal(new Date()),
   );
 
   const [bookingSearch, setBookingSearch] = useState("");
@@ -155,7 +161,7 @@ const Admin = () => {
 
       setUseWorkshopAvailability(
         act.useWorkshopAvailability !== false &&
-          act.useWorkshopAvailability !== "false"
+          act.useWorkshopAvailability !== "false",
       );
 
       setSlotMinutes(act.bookingRules?.slotMinutes || 60);
@@ -166,7 +172,7 @@ const Admin = () => {
       setWeeklyPricing(
         act.pricingRules?.weekly?.length
           ? act.pricingRules.weekly
-          : emptyWeeklyPricing()
+          : emptyWeeklyPricing(),
       );
 
       setNewActPopupVisible(true);
@@ -187,8 +193,8 @@ const Admin = () => {
                 { start: "15:00", end: "18:00", pricePerHour: 279 },
               ],
             }
-          : d
-      )
+          : d,
+      ),
     );
   };
 
@@ -199,11 +205,11 @@ const Admin = () => {
           ? {
               ...d,
               ranges: d.ranges.map((r, i) =>
-                i === idx ? { ...r, ...patch } : r
+                i === idx ? { ...r, ...patch } : r,
               ),
             }
-          : d
-      )
+          : d,
+      ),
     );
   };
 
@@ -212,8 +218,8 @@ const Admin = () => {
       prev.map((d) =>
         d.day === day
           ? { ...d, ranges: d.ranges.filter((_, i) => i !== idx) }
-          : d
-      )
+          : d,
+      ),
     );
   };
 
@@ -271,7 +277,7 @@ const Admin = () => {
       loadBookings();
     } catch (e) {
       toast.error(
-        e?.response?.data?.message || "Kunde inte markera som betald"
+        e?.response?.data?.message || "Kunde inte markera som betald",
       );
     } finally {
       setIsMarkingPaid(false);
@@ -361,7 +367,7 @@ const Admin = () => {
       const to = addDaysISO(selectedDate, 1);
 
       const res = await axios.get(
-        `/booking/workshop/${workshopId}?from=${selectedDate}&to=${to}`
+        `/booking/workshop/${workshopId}?from=${selectedDate}&to=${to}`,
       );
 
       const normalized = (res.data.bookings || []).map((b) => {
@@ -420,6 +426,51 @@ const Admin = () => {
     }
   };
 
+  const loadWorkshopSettings = async () => {
+    if (!workshopId) return;
+    try {
+      setPaymentLoading(true);
+      const res = await axios.get(`/workshop/${workshopId}/settings`);
+      const opts = res.data?.paymentOptions || {
+        allowOnsite: true,
+        allowOnline: true,
+      };
+      setPaymentOptions({
+        allowOnsite: opts.allowOnsite !== false,
+        allowOnline: opts.allowOnline !== false,
+      });
+    } catch {
+      setPaymentOptions({ allowOnsite: true, allowOnline: true });
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
+  const saveWorkshopSettings = async () => {
+    if (!workshopId) return;
+
+    // stoppa att båda blir false
+    if (!paymentOptions.allowOnsite && !paymentOptions.allowOnline) {
+      toast.error("Minst ett betalsätt måste vara aktivt");
+      return;
+    }
+
+    try {
+      setPaymentLoading(true);
+      await axios.patch(`/workshop/${workshopId}/settings`, {
+        paymentOptions,
+      });
+      toast.success("Betalinställningar sparade ✅");
+      loadWorkshopSettings();
+    } catch (e) {
+      toast.error(
+        e?.response?.data?.message || "Kunde inte spara betalinställningar",
+      );
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (!canUseAdmin) return;
     loadActivities();
@@ -428,12 +479,12 @@ const Admin = () => {
   useEffect(() => {
     if (!canUseAdmin) return;
 
-    if (page === 1) {
-      loadWorkshopAvailability();
-      loadBookings();
-    }
+    if (page === 1) loadBookings();
     if (page === 2) loadActivities();
-    if (page === 3) loadWorkshopAvailability();
+    if (page === 3) {
+      loadWorkshopAvailability();
+      loadWorkshopSettings();
+    }
   }, [page, canUseAdmin]);
 
   // --- Create activity ---
@@ -521,7 +572,7 @@ const Admin = () => {
 
   const updateException = (idx, patch) => {
     setExceptions((prev) =>
-      prev.map((e, i) => (i === idx ? { ...e, ...patch } : e))
+      prev.map((e, i) => (i === idx ? { ...e, ...patch } : e)),
     );
   };
 
@@ -531,7 +582,7 @@ const Admin = () => {
 
   const updateWeekly = (idx, patch) => {
     setWeekly((prev) =>
-      prev.map((w, i) => (i === idx ? { ...w, ...patch } : w))
+      prev.map((w, i) => (i === idx ? { ...w, ...patch } : w)),
     );
   };
 
@@ -677,7 +728,7 @@ const Admin = () => {
                       month: "2-digit",
                       hour: "2-digit",
                       minute: "2-digit",
-                    })
+                    }),
                   );
 
                   const end = new Date(b.endAt).toLocaleTimeString("sv-SE", {
@@ -691,8 +742,8 @@ const Admin = () => {
                         ? "Betald (på plats)"
                         : "Betald (online)"
                       : b.paymentMethod === "onsite"
-                      ? "Obetald (på plats)"
-                      : "Obetald";
+                        ? "Obetald (på plats)"
+                        : "Obetald";
 
                   return (
                     <div
@@ -895,7 +946,7 @@ const Admin = () => {
                             } else {
                               // Ta bort dag => stängt
                               setWeekly((prev) =>
-                                prev.filter((x) => x.day !== day)
+                                prev.filter((x) => x.day !== day),
                               );
                             }
                           }}
@@ -1023,6 +1074,87 @@ const Admin = () => {
             >
               {calendarLoading ? "Sparar..." : "Spara öppettider"}
             </button>
+          </div>
+
+          <div className="admin-card">
+            <div className="calendar-head">
+              <div>
+                <h3 style={{ margin: 0 }}>Betalning</h3>
+                <p className="admin-muted" style={{ margin: "6px 0 0 0" }}>
+                  Välj vilka betalsätt kunder får använda i bokningen.
+                </p>
+              </div>
+
+              <button
+                className="admin-btn"
+                onClick={saveWorkshopSettings}
+                disabled={paymentLoading}
+              >
+                {paymentLoading ? "Sparar..." : "Spara betalsätt"}
+              </button>
+            </div>
+
+            <div className="weekly-cards">
+              <div className="weekly-card">
+                <div className="weekly-left">
+                  <div className="weekly-day-pill">Onsite</div>
+                  <div
+                    className={`weekly-status ${
+                      paymentOptions.allowOnsite ? "open" : "closed"
+                    }`}
+                  >
+                    {paymentOptions.allowOnsite ? "Aktiv" : "Av"}
+                  </div>
+                </div>
+
+                <div className="weekly-right">
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={paymentOptions.allowOnsite}
+                      onChange={(e) =>
+                        setPaymentOptions((p) => ({
+                          ...p,
+                          allowOnsite: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className="toggle-ui" />
+                    <span className="toggle-text">Betala på plats</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="weekly-card">
+                <div className="weekly-left">
+                  <div className="weekly-day-pill">Online</div>
+                  <div
+                    className={`weekly-status ${
+                      paymentOptions.allowOnline ? "open" : "closed"
+                    }`}
+                  >
+                    {paymentOptions.allowOnline ? "Aktiv" : "Av"}
+                  </div>
+                </div>
+
+                <div className="weekly-right">
+                  <label className="toggle">
+                    <input
+                      type="checkbox"
+                      checked={paymentOptions.allowOnline}
+                      onChange={(e) =>
+                        setPaymentOptions((p) => ({
+                          ...p,
+                          allowOnline: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span className="toggle-ui" />
+                    <span className="toggle-text">Betala online</span>
+                  </label>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1343,8 +1475,8 @@ const Admin = () => {
                     ? "Uppdaterar..."
                     : "Uppdatera aktivitet"
                   : isSubmitting
-                  ? "Skapar..."
-                  : "Skapa aktivitet"}
+                    ? "Skapar..."
+                    : "Skapa aktivitet"}
               </button>
             </div>
           </div>
@@ -1426,7 +1558,7 @@ const Admin = () => {
                         {
                           hour: "2-digit",
                           minute: "2-digit",
-                        }
+                        },
                       )}`
                     : ""}
                 </div>
@@ -1469,8 +1601,8 @@ const Admin = () => {
                         ? "Betald (på plats)"
                         : "Betald (online)"
                       : bookingTarget?.paymentMethod === "onsite"
-                      ? "Obetald (på plats)"
-                      : "Obetald"}
+                        ? "Obetald (på plats)"
+                        : "Obetald"}
                   </span>
                 </div>
               </div>

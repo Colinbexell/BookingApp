@@ -97,10 +97,32 @@ const createBooking = async (req, res) => {
         .json({ message: "paymentMethod must be onsite|online" });
 
     const act = await Activity.findById(activityId).select(
-      "workshopId bookingRules pricingRules tracks bookingUnit partyRules takesPayment"
+      "workshopId bookingRules pricingRules tracks bookingUnit partyRules takesPayment",
     );
 
     if (!act) return res.status(400).json({ message: "Invalid activityId" });
+
+    const ws = await mongoose
+      .model("Workshop")
+      .findById(act.workshopId)
+      .select("paymentOptions");
+
+    const payOpts = ws?.paymentOptions || {
+      allowOnsite: true,
+      allowOnline: true,
+    };
+
+    if (paymentMethod === "onsite" && payOpts.allowOnsite === false) {
+      return res
+        .status(400)
+        .json({ message: "Betala på plats är inte tillåtet" });
+    }
+
+    if (paymentMethod === "online" && payOpts.allowOnline === false) {
+      return res
+        .status(400)
+        .json({ message: "Betala online är inte tillåtet" });
+    }
 
     const slotMinutes = act.bookingRules?.slotMinutes || 60;
     const slots = Number(durationSlots);
@@ -363,7 +385,7 @@ const cancelBookings = async (req, res) => {
 
     const result = await Booking.updateMany(
       { _id: { $in: ids } },
-      { $set: { status: "cancelled" } }
+      { $set: { status: "cancelled" } },
     );
 
     return res.json({ ok: true, modified: result.modifiedCount });
@@ -390,7 +412,7 @@ const markBookingsPaid = async (req, res) => {
     // Markera bara aktiva bokningar som betalda
     const result = await Booking.updateMany(
       { _id: { $in: ids }, status: "active" },
-      { $set: { paymentStatus: "paid" } }
+      { $set: { paymentStatus: "paid" } },
     );
 
     return res.json({ ok: true, modified: result.modifiedCount });
