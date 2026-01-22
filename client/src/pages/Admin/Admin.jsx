@@ -31,6 +31,7 @@ import Sidebar from "./components/Sidebar/Sidebar";
 import ActivityCard from "./components/ActivityCard/ActivityCard";
 
 import Plus from "../../assets/Plus_white.png";
+import RefreshIcon from "../../assets/Refresh.png";
 import { API_BASE_URL } from "../../../config";
 
 axios.defaults.baseURL = API_BASE_URL;
@@ -993,9 +994,9 @@ const Admin = () => {
                   onChange={(e) => setSelectedDate(e.target.value)}
                 />
 
-                <button className="admin-btn secondary" onClick={loadBookings}>
-                  Uppdatera
-                </button>
+                <div className="refresh" onClick={loadBookings}>
+                  <img src={RefreshIcon} alt="" />
+                </div>
               </div>
             </div>
 
@@ -1490,9 +1491,9 @@ const Admin = () => {
                 <option value="last_5_years">Senaste 5 år (år)</option>
               </select>
 
-              <button className="admin-btn secondary" onClick={loadStats}>
-                {statsLoading ? "Laddar..." : "Uppdatera"}
-              </button>
+              <div className="refresh" onClick={loadStats}>
+                <img src={RefreshIcon} alt="" />
+              </div>
             </div>
           </div>
 

@@ -822,3 +822,17 @@
 .stats-preset-select {
   min-width: 260px;
 }
+
+.refresh {
+  height: 35px;
+  cursor: pointer;
+  transition: all ease-in-out 0.1s;
+}
+
+.refresh:hover {
+  transform: scale(1.07);
+}
+
+.refresh img {
+  height: 90%;
+}
