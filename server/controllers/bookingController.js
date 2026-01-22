@@ -250,7 +250,7 @@ const createBooking = async (req, res) => {
 const listBookingsForWorkshop = async (req, res) => {
   try {
     const { workshopId } = req.params;
-    const { from, to } = req.query;
+    const { from, to, status = "active" } = req.query;
 
     if (!workshopId)
       return res.status(400).json({ message: "workshopId is required" });
@@ -267,7 +267,7 @@ const listBookingsForWorkshop = async (req, res) => {
       {
         $match: {
           workshopId: wsId,
-          status: "active",
+          ...(status === "all" ? {} : { status }),
           startAt: { $lte: toEnd },
           endAt: { $gte: fromStart },
         },

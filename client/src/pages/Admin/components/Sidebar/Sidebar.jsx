@@ -3,8 +3,8 @@ import "./Sidebar.css";
 
 import ActivityIcon from "../../../../assets/Activity_black.png";
 import BookingIcon from "../../../../assets/Check_black.png";
-import CalendarIcon from "../../../../assets/Settings.png";
-import StatsIcon from "../../../../assets/Settings.png";
+import CalendarIcon from "../../../../assets/Calendar.png";
+import StatsIcon from "../../../../assets/Statistics.png";
 
 const Sidebar = ({ page, setpage }) => {
   return (

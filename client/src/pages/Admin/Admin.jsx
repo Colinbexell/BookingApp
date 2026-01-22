@@ -173,6 +173,7 @@ const Admin = () => {
   // Bokningsdetaljer + betalningsverifiering
   const [bookingPopupOpen, setBookingPopupOpen] = useState(false);
   const [bookingTarget, setBookingTarget] = useState(null);
+  const [bookingFilter, setBookingFilter] = useState("active");
 
   const [verifyPopupOpen, setVerifyPopupOpen] = useState(false);
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
@@ -475,10 +476,10 @@ const Admin = () => {
     if (!workshopId) return;
 
     try {
-      const to = addDaysISO(selectedDate, 1);
+      const to = selectedDate;
 
       const res = await axios.get(
-        `/booking/workshop/${workshopId}?from=${selectedDate}&to=${to}`,
+        `/booking/workshop/${workshopId}?from=${selectedDate}&to=${to}&status=${bookingFilter}`,
       );
 
       const normalized = (res.data.bookings || []).map((b) => {
@@ -600,7 +601,7 @@ const Admin = () => {
       loadActivities();
       loadStats();
     }
-  }, [page, canUseAdmin, statsPreset]);
+  }, [page, canUseAdmin, statsPreset, selectedDate, bookingFilter]);
 
   // --- Create activity ---
   const submitActivity = async () => {
@@ -868,23 +869,32 @@ const Admin = () => {
     const now = Date.now();
     const graceMs = 5 * 60 * 1000; // 5 minuter
 
-    const { startMs, endMs, isClosed } = getBusinessWindow(selectedDate);
-    if (isClosed) return [];
+    const dayStart = makeLocalDateTime(selectedDate, "00:00").getTime();
+    const dayEnd = makeLocalDateTime(
+      addDaysISO(selectedDate, 1),
+      "00:00",
+    ).getTime();
 
     const list = bookings
-      // ✅ Visa bara bokningar som tillhör vald "business day"
+      // ✅ Visa bokningar som tillhör kalender-dygnet (00:00–00:00)
       .filter((b) => {
         const start = new Date(b.startAt).getTime();
-        if (startMs != null && start < startMs) return false;
-        if (endMs != null && start >= endMs) return false;
-        return true;
+        return start >= dayStart && start < dayEnd;
+      })
+      // ✅ filter: status (active/cancelled)
+      .filter((b) => {
+        if (!bookingFilter) return true;
+        return b.status === bookingFilter;
       })
       // ✅ Visa bara bokningar som inte har “löpt ut” (endAt + 5 min) – men bara för idag
       .filter((b) => {
+        // om vi tittar på avbokade: visa dem alltid (ingen "grace"-gömning)
+        if (bookingFilter === "cancelled") return true;
+
         const todayISO = new Date().toISOString().slice(0, 10);
         const isToday = selectedDate === todayISO;
 
-        if (!isToday) return true; // ✅ om du kollar annan dag: visa bokningarna ändå
+        if (!isToday) return true;
 
         const endMsLocal = new Date(b.endAt).getTime();
         return endMsLocal + graceMs > now;
@@ -917,6 +927,7 @@ const Admin = () => {
     bookingSearch,
     bookingActivityFilter,
     bookingSort,
+    bookingFilter,
     selectedDate,
     weekly,
     exceptions,
@@ -934,6 +945,15 @@ const Admin = () => {
               </div>
 
               <div className="bookings-controls">
+                <select
+                  className="booking-select"
+                  value={bookingFilter}
+                  onChange={(e) => setBookingFilter(e.target.value)}
+                >
+                  <option value="active">Aktiva bokningar</option>
+                  <option value="cancelled">Avbokade bokningar</option>
+                </select>
+
                 {/* 🎯 Aktivitet-filter */}
                 <select
                   className="booking-select"
