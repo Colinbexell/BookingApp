@@ -3,6 +3,8 @@ import axios from "axios";
 import { toast } from "react-hot-toast";
 import "./Admin.css";
 
+import TrashIcon from "../../assets/Trash.png";
+
 import { Line, Bar, Pie } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -1351,12 +1353,9 @@ const Admin = () => {
                       }
                     />
 
-                    <button
-                      className="admin-btn danger"
-                      onClick={() => removeException(idx)}
-                    >
-                      Ta bort
-                    </button>
+                    <div className="trash" onClick={() => removeException(idx)}>
+                      <img src={TrashIcon} alt="" />
+                    </div>
                   </div>
                 ))}
               </div>
