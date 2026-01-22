@@ -4,8 +4,7 @@ import "./Sidebar.css";
 import ActivityIcon from "../../../../assets/Activity_black.png";
 import BookingIcon from "../../../../assets/Check_black.png";
 import CalendarIcon from "../../../../assets/Settings.png";
-import UserIcon from "../../../../assets/User.png";
-import SettingsIcon from "../../../../assets/Settings.png";
+import StatsIcon from "../../../../assets/Settings.png";
 
 const Sidebar = ({ page, setpage }) => {
   return (
@@ -40,17 +39,18 @@ const Sidebar = ({ page, setpage }) => {
             <img src={CalendarIcon} alt="" className="side-icon" />
             <h3 className="side-button-txt">Kalender</h3>
           </div>
+
+          <div
+            className={`side-button ${page === 4 ? "active" : ""}`}
+            onClick={() => setpage(4)}
+          >
+            <img src={StatsIcon} alt="" className="side-icon" />
+            <h3 className="side-button-txt">Statistik</h3>
+          </div>
         </div>
       </div>
 
-      <div className="sidebar-bottom">
-        <div className="bottom-button">
-          <img src={UserIcon} alt="" />
-        </div>
-        <div className="bottom-button">
-          <img src={SettingsIcon} alt="" />
-        </div>
-      </div>
+      <div className="sidebar-bottom"></div>
     </div>
   );
 };

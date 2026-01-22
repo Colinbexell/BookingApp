@@ -818,3 +818,7 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+
+.stats-preset-select {
+  min-width: 260px;
+}

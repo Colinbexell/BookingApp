@@ -21,7 +21,7 @@ app.use(
   cors({
     origin: "http://localhost:5173",
     credentials: true,
-  })
+  }),
 );
 
 app.use(express.json());
@@ -35,6 +35,7 @@ app.use("/workshop", require("./routes/workshopRoutes"));
 app.use("/activity", require("./routes/activityRoutes"));
 app.use("/booking", require("./routes/bookingRoutes"));
 app.use("/upload", require("./routes/uploadRoutes"));
+app.use("/stats", require("./routes/statsRoutes"));
 
 // Start the server
 app.listen(6969, () => {

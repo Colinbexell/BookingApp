@@ -3,6 +3,30 @@ import axios from "axios";
 import { toast } from "react-hot-toast";
 import "./Admin.css";
 
+import { Line, Bar, Pie } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Tooltip,
+  Legend,
+);
+
 import Sidebar from "./components/Sidebar/Sidebar";
 import ActivityCard from "./components/ActivityCard/ActivityCard";
 
@@ -28,6 +52,60 @@ const addDaysISO = (isoDate, days) => {
   const dt = new Date(y, m - 1, d);
   dt.setDate(dt.getDate() + days);
   return toISODateLocal(dt);
+};
+
+const startOfISODateLocal = (iso) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+};
+
+const endOfISODateLocal = (iso) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d, 23, 59, 59, 999);
+};
+
+const formatISO = (d) => toISODateLocal(d);
+
+const getPresetRange = (preset) => {
+  const now = new Date();
+  const todayISO = formatISO(now);
+
+  if (preset === "today") {
+    return { from: todayISO, to: todayISO, groupBy: "day", label: "Idag" };
+  }
+
+  if (preset === "last_week") {
+    // senaste 7 dagar inkl idag
+    const from = formatISO(
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6),
+    );
+    return { from, to: todayISO, groupBy: "day", label: "Senaste veckan" };
+  }
+
+  if (preset === "last_month") {
+    // senaste 30 dagar inkl idag (enkelt och stabilt)
+    const from = formatISO(
+      new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29),
+    );
+    return { from, to: todayISO, groupBy: "week", label: "Senaste månaden" };
+  }
+
+  if (preset === "last_year") {
+    // senaste 12 månader tillbaka från idag
+    const from = formatISO(
+      new Date(now.getFullYear() - 1, now.getMonth(), now.getDate() + 1),
+    );
+    return { from, to: todayISO, groupBy: "month", label: "Senaste året" };
+  }
+
+  if (preset === "last_5_years") {
+    const from = formatISO(
+      new Date(now.getFullYear() - 5, now.getMonth(), now.getDate() + 1),
+    );
+    return { from, to: todayISO, groupBy: "year", label: "Senaste 5 åren" };
+  }
+
+  return { from: todayISO, to: todayISO, groupBy: "day", label: "Idag" };
 };
 
 const Admin = () => {
@@ -65,6 +143,27 @@ const Admin = () => {
   const [bookingSearch, setBookingSearch] = useState("");
   const [bookingActivityFilter, setBookingActivityFilter] = useState("all"); // activityId | "all"
   const [bookingSort, setBookingSort] = useState("asc"); // "asc" = närmast först, "desc" = tvärtom
+
+  // Statistik
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [stats, setStats] = useState(null);
+
+  const [statsPreset, setStatsPreset] = useState("today");
+
+  const [chartTheme, setChartTheme] = useState({
+    bookings: "#6495fe",
+    cancellations: "#ef4444",
+    preliminaryRevenue: "#f59e0b",
+    actualRevenue: "#10b981",
+    bars: "#5087ff",
+    pieOnline: "#10b981",
+    pieOnsite: "#f59e0b",
+    grid: "rgba(148, 163, 184, 0.25)",
+    text: "#0f172a",
+  });
+
+  const [chartAnimation, setChartAnimation] = useState(true);
+  const [chartAnimationMs, setChartAnimationMs] = useState(800);
 
   // Avboknings Popup
   const [cancelPopupOpen, setCancelPopupOpen] = useState(false);
@@ -223,13 +322,6 @@ const Admin = () => {
     );
   };
 
-  // Avboka en bokning
-  const cancelBookingRow = (b) => {
-    if (b.status !== "active") return;
-    setCancelTarget(b);
-    setCancelPopupOpen(true);
-  };
-
   const confirmCancelBooking = async () => {
     if (!cancelTarget) return;
 
@@ -292,6 +384,25 @@ const Admin = () => {
       setActivities(res.data.activities || []);
     } catch {
       toast.error("Kunde inte hämta aktiviteter");
+    }
+  };
+
+  // --- Load statistics ---
+  const loadStats = async () => {
+    if (!workshopId) return;
+
+    const { from, to, groupBy } = getPresetRange(statsPreset);
+
+    try {
+      setStatsLoading(true);
+      const res = await axios.get(
+        `/stats/workshop/${workshopId}?from=${from}&to=${to}&groupBy=${groupBy}`,
+      );
+      setStats(res.data);
+    } catch (e) {
+      toast.error(e?.response?.data?.message || "Kunde inte hämta statistik");
+    } finally {
+      setStatsLoading(false);
     }
   };
 
@@ -485,7 +596,11 @@ const Admin = () => {
       loadWorkshopAvailability();
       loadWorkshopSettings();
     }
-  }, [page, canUseAdmin]);
+    if (page === 4) {
+      loadActivities();
+      loadStats();
+    }
+  }, [page, canUseAdmin, statsPreset]);
 
   // --- Create activity ---
   const submitActivity = async () => {
@@ -585,6 +700,167 @@ const Admin = () => {
       prev.map((w, i) => (i === idx ? { ...w, ...patch } : w)),
     );
   };
+
+  const statsCharts = useMemo(() => {
+    const c = stats?.charts;
+    const k = stats?.kpis;
+
+    const timeSeries = c?.timeSeries || [];
+    const labels = timeSeries.map((x) => x.key);
+
+    const commonLine = {
+      borderWidth: 2,
+      pointRadius: 2,
+      pointHoverRadius: 5,
+      tension: 0.35,
+    };
+
+    const lineData = {
+      labels,
+      datasets: [
+        {
+          label: "Bokningar",
+          data: timeSeries.map((x) => x.bookings || 0),
+          borderColor: chartTheme.bookings,
+          backgroundColor: chartTheme.bookings,
+          ...commonLine,
+        },
+        {
+          label: "Avbokningar",
+          data: timeSeries.map((x) => x.cancellations || 0),
+          borderColor: chartTheme.cancellations,
+          backgroundColor: chartTheme.cancellations,
+          ...commonLine,
+        },
+        {
+          label: "Preliminär oms.",
+          data: timeSeries.map((x) => x.preliminaryRevenue || 0),
+          borderColor: chartTheme.preliminaryRevenue,
+          backgroundColor: chartTheme.preliminaryRevenue,
+          ...commonLine,
+        },
+        {
+          label: "Faktisk oms.",
+          data: timeSeries.map((x) => x.actualRevenue || 0),
+          borderColor: chartTheme.actualRevenue,
+          backgroundColor: chartTheme.actualRevenue,
+          ...commonLine,
+        },
+      ],
+    };
+
+    const topActs = c?.topActivitiesByBookings || [];
+    const topActsBar = {
+      labels: topActs.map((x) => x.activityTitle || "Okänd"),
+      datasets: [
+        {
+          label: "Bokningar",
+          data: topActs.map((x) => x.count || 0),
+          backgroundColor: chartTheme.bars,
+          borderRadius: 8,
+        },
+      ],
+    };
+
+    const weekday = c?.weekdayCounts || [];
+    const weekdayBar = {
+      labels: weekday.map((x) => dayNames[x.weekday] || String(x.weekday)),
+      datasets: [
+        {
+          label: "Bokningar",
+          data: weekday.map((x) => x.count || 0),
+          backgroundColor: chartTheme.bars,
+          borderRadius: 8,
+        },
+      ],
+    };
+
+    const pieData = {
+      labels: ["Online", "På plats"],
+      datasets: [
+        {
+          label: "Betalningsmetod",
+          data: [k?.payOnlineCount || 0, k?.payOnsiteCount || 0],
+          backgroundColor: [chartTheme.pieOnline, chartTheme.pieOnsite],
+          borderWidth: 0,
+        },
+      ],
+    };
+
+    const rangeInfo = getPresetRange(statsPreset);
+
+    let periodBarTitle = "Bokningar";
+    let periodBar = { labels: [], datasets: [] };
+
+    if (statsPreset === "today" || statsPreset === "last_week") {
+      periodBarTitle = "Bokningar per veckodag";
+      const weekday = c?.weekdayCounts || [];
+      periodBar = {
+        labels: weekday.map((x) => dayNames[x.weekday] || String(x.weekday)),
+        datasets: [
+          {
+            label: "Bokningar",
+            data: weekday.map((x) => x.count || 0),
+            backgroundColor: chartTheme.bars,
+            borderRadius: 8,
+          },
+        ],
+      };
+    } else {
+      // last_month -> weeks, last_year -> months, last_5_years -> years
+      periodBarTitle =
+        statsPreset === "last_month"
+          ? "Bokningar per vecka (senaste månaden)"
+          : statsPreset === "last_year"
+            ? "Bokningar per månad (senaste året)"
+            : "Bokningar per år (senaste 5 åren)";
+
+      const ts = c?.timeSeries || [];
+      periodBar = {
+        labels: ts.map((x) => x.key),
+        datasets: [
+          {
+            label: "Bokningar",
+            data: ts.map((x) => (x.bookings || 0) + (x.cancellations || 0)),
+            backgroundColor: chartTheme.bars,
+            borderRadius: 8,
+          },
+        ],
+      };
+    }
+
+    return { lineData, topActsBar, pieData, periodBar, periodBarTitle };
+  }, [stats, chartTheme, statsPreset]);
+
+  const chartOptions = useMemo(() => {
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: chartAnimation
+        ? { duration: chartAnimationMs, easing: "easeOutQuart" }
+        : false,
+      plugins: {
+        legend: {
+          labels: {
+            color: chartTheme.text,
+          },
+        },
+        tooltip: {
+          enabled: true,
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: chartTheme.text },
+          grid: { color: chartTheme.grid },
+        },
+        y: {
+          ticks: { color: chartTheme.text },
+          grid: { color: chartTheme.grid },
+        },
+      },
+    };
+  }, [chartAnimation, chartAnimationMs, chartTheme]);
 
   const filteredBookings = useMemo(() => {
     const q = bookingSearch.trim().toLowerCase();
@@ -1161,6 +1437,218 @@ const Admin = () => {
     );
   };
 
+  const renderStats = () => {
+    const k = stats?.kpis;
+    const rangeInfo = getPresetRange(statsPreset);
+
+    const isStatsReady =
+      !!stats &&
+      !!statsCharts?.lineData?.labels &&
+      !!statsCharts?.topActsBar?.labels &&
+      !!statsCharts?.pieData?.labels &&
+      !!statsCharts?.periodBar?.labels;
+
+    return (
+      <div className="admin-content">
+        <div className="admin-inner">
+          <div className="admin-topbar">
+            <div>
+              <h1>Statistik</h1>
+              <p>Överblick, intäkter, beteende och uppföljning.</p>
+            </div>
+
+            <div className="admin-actions">
+              <select
+                className="booking-select stats-preset-select"
+                value={statsPreset}
+                onChange={(e) => setStatsPreset(e.target.value)}
+              >
+                <option value="today">Idag</option>
+                <option value="last_week">Senaste vecka (veckodagar)</option>
+                <option value="last_month">Senaste månad (veckor)</option>
+                <option value="last_year">Senaste år (månader)</option>
+                <option value="last_5_years">Senaste 5 år (år)</option>
+              </select>
+
+              <button className="admin-btn secondary" onClick={loadStats}>
+                {statsLoading ? "Laddar..." : "Uppdatera"}
+              </button>
+            </div>
+          </div>
+
+          <div className="admin-card" style={{ padding: "12px 16px" }}>
+            <div className="admin-muted" style={{ fontSize: 13 }}>
+              Filter: <strong>{rangeInfo.label}</strong>
+              {" • "}
+              Period:{" "}
+              <strong>
+                {rangeInfo.from} → {rangeInfo.to}
+              </strong>
+              {" • "}
+              Aggregering:{" "}
+              <strong>
+                {rangeInfo.groupBy === "day"
+                  ? "per dag"
+                  : rangeInfo.groupBy === "week"
+                    ? "per vecka"
+                    : rangeInfo.groupBy === "month"
+                      ? "per månad"
+                      : "per år"}
+              </strong>
+            </div>
+          </div>
+
+          <div className="admin-card">
+            <h3 style={{ marginTop: 0 }}>KPI</h3>
+
+            <div className="booking-modal-grid">
+              <div className="booking-field">
+                <div className="booking-label">Totala bokningar</div>
+                <div className="booking-value">{k?.totalBookings || 0}</div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Avbokningar</div>
+                <div className="booking-value">
+                  {k?.totalCancellations || 0}
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Avbokningsgrad</div>
+                <div className="booking-value">
+                  {(k?.cancellationRate || 0).toFixed(1)}%
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Preliminär omsättning</div>
+                <div className="booking-value">
+                  {Math.round(k?.preliminaryRevenue || 0)} SEK
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Faktisk omsättning</div>
+                <div className="booking-value">
+                  {Math.round(k?.actualRevenue || 0)} SEK
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Snitt bokningar/dag</div>
+                <div className="booking-value">
+                  {(k?.avgBookingsPerDay || 0).toFixed(2)}
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Lead time (snitt)</div>
+                <div className="booking-value">
+                  {(k?.avgLeadTimeHours || 0).toFixed(1)} h
+                </div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">Obetalda (passerade)</div>
+                <div className="booking-value">{k?.unpaidAttention || 0}</div>
+              </div>
+
+              <div className="booking-field">
+                <div className="booking-label">
+                  Utnyttjad kapacitet (approx)
+                </div>
+                <div className="booking-value">
+                  {(k?.utilizationApproxPct || 0).toFixed(1)}%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {!isStatsReady ? (
+            <div className="admin-card">
+              <p className="admin-muted" style={{ margin: 0 }}>
+                Laddar statistik…
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="admin-card">
+                <h3 style={{ marginTop: 0 }}>
+                  Bokningar & omsättning över tid
+                </h3>
+                <p className="admin-muted" style={{ marginTop: 4 }}>
+                  Visar bokningar och omsättning grupperat{" "}
+                  <strong>
+                    {rangeInfo.groupBy === "day"
+                      ? "per dag"
+                      : rangeInfo.groupBy === "week"
+                        ? "per vecka"
+                        : rangeInfo.groupBy === "month"
+                          ? "per månad"
+                          : "per år"}
+                  </strong>{" "}
+                  för vald period.
+                </p>
+
+                <div style={{ width: "100%", height: 340 }}>
+                  <Line data={statsCharts.lineData} options={chartOptions} />
+                </div>
+              </div>
+
+              <div className="admin-card">
+                <h3 style={{ marginTop: 0 }}>{statsCharts.periodBarTitle}</h3>
+                <p className="admin-muted" style={{ marginTop: 4 }}>
+                  {statsPreset === "today" || statsPreset === "last_week"
+                    ? "Visar veckodagar (Sön–Lör) för vald period."
+                    : statsPreset === "last_month"
+                      ? "Varje stapel är en vecka (grupperat per vecka)."
+                      : statsPreset === "last_year"
+                        ? "Varje stapel är en månad (grupperat per månad)."
+                        : "Varje stapel är ett år (grupperat per år)."}
+                </p>
+
+                <div style={{ width: "100%", height: 340 }}>
+                  <Bar data={statsCharts.periodBar} options={chartOptions} />
+                </div>
+              </div>
+
+              <div className="admin-card">
+                <h3 style={{ marginTop: 0 }}>Populäraste aktiviteter</h3>
+                <p className="admin-muted" style={{ marginTop: 4 }}>
+                  Antal bokningar per aktivitet för{" "}
+                  <strong>{rangeInfo.label}</strong> ({rangeInfo.from} →{" "}
+                  {rangeInfo.to}).
+                </p>
+
+                <div style={{ width: "100%", height: 340 }}>
+                  <Bar data={statsCharts.topActsBar} options={chartOptions} />
+                </div>
+              </div>
+
+              <div className="admin-card">
+                <h3 style={{ marginTop: 0 }}>Betalningsmetod</h3>
+                <p className="admin-muted" style={{ marginTop: 4 }}>
+                  Fördelning av bokningar baserat på valt betalsätt.
+                </p>
+
+                <div style={{ width: "100%", height: 340 }}>
+                  <Pie
+                    data={statsCharts.pieData}
+                    options={{
+                      ...chartOptions,
+                      scales: undefined,
+                    }}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderContent = () => {
     if (!canUseAdmin) {
       return (
@@ -1177,6 +1665,7 @@ const Admin = () => {
     if (page === 1) return renderBookings();
     if (page === 2) return renderActivities();
     if (page === 3) return renderCalendar();
+    if (page === 4) return renderStats();
 
     return null;
   };
