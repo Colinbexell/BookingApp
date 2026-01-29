@@ -624,65 +624,92 @@ const Home = () => {
         return;
       }
 
-      const payload = bookData.flatMap((b) =>
+      const workshopId = localStorage.getItem("selectedWorkshopId") || "";
+      if (!workshopId) {
+        toast.error("Saknar workshopId");
+        return;
+      }
+
+      const items = bookData.flatMap((b) =>
         (b.selections || []).map((sel) => ({
           activityId: b.activityId,
           startISO: sel.startISO,
           durationSlots: sel.durationSlots,
-          customerName,
-          email,
-          phone,
-          paymentMethod, // onsite | online
-
           partySize: Number(b.partySize || 1),
         })),
       );
 
-      if (payload.length === 0) {
+      if (items.length === 0) {
         toast.error("Inga tider valda");
         return;
       }
 
-      const results = await Promise.allSettled(
-        payload.map((p) => axios.post("/booking/create", p)),
-      );
-      const failed = results.filter((r) => r.status === "rejected");
+      // ✅ 1) Onsite -> skapa bokningar direkt (som tidigare)
+      if (paymentMethod === "onsite") {
+        const payload = items.map((it) => ({
+          ...it,
+          customerName,
+          email,
+          phone,
+          paymentMethod: "onsite",
+        }));
 
-      if (failed.length > 0) {
-        const err = failed[0].reason;
-        const status = err?.response?.status;
-        const msg =
-          err?.response?.data?.message ||
-          err?.response?.data?.error ||
-          "Bokning misslyckades";
+        const results = await Promise.allSettled(
+          payload.map((p) => axios.post("/booking/create", p)),
+        );
 
-        if (status === 409) {
-          toast.error(
-            "Minst en bokning misslyckades (någon hann boka före). Uppdatera tider.",
-          );
-          await loadAvailabilityForSelected();
-          return;
-        }
+        const failed = results.filter((r) => r.status === "rejected");
+        if (failed.length > 0) {
+          const err = failed[0].reason;
+          const status = err?.response?.status;
+          const msg =
+            err?.response?.data?.message ||
+            err?.response?.data?.error ||
+            "Bokning misslyckades";
 
-        if (status === 400) {
+          if (status === 409) {
+            toast.error(
+              "Minst en bokning misslyckades (någon hann boka före). Uppdatera tider.",
+            );
+            await loadAvailabilityForSelected();
+            return;
+          }
+
           toast.error(msg);
           return;
         }
 
-        toast.error(msg);
+        toast.success("Bokning klar 🎉");
+        localStorage.removeItem("bookData");
+        setBookData([]);
+        setCustomerName("");
+        setEmail("");
+        setPhone("");
+        setPaymentMethod("onsite");
+        setPage(1);
         return;
       }
 
-      toast.success("Bokning klar 🎉");
-      localStorage.removeItem("bookData");
-      setBookData([]);
-      setCustomerName("");
-      setEmail("");
-      setPhone("");
-      setPaymentMethod("onsite");
-      setPage(1);
-    } catch {
-      toast.error("Kunde inte slutföra bokning");
+      // ✅ 2) Online -> skapa INGA bokningar, bara Stripe Checkout (via HOLD)
+      const res = await axios.post("/payment/create-checkout-session", {
+        workshopId,
+        items,
+        customer: { customerName, email, phone },
+      });
+
+      const url = res.data?.url;
+      if (!url) {
+        toast.error("Kunde inte starta betalning");
+        return;
+      }
+
+      window.location.href = url;
+    } catch (e) {
+      const msg =
+        e?.response?.data?.message ||
+        e?.response?.data?.error ||
+        "Kunde inte slutföra";
+      toast.error(msg);
     } finally {
       setSubmittingBooking(false);
     }

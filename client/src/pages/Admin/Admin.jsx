@@ -330,14 +330,26 @@ const Admin = () => {
     if (!cancelTarget) return;
 
     try {
-      setIsCancelling(true);
-      await axios.patch("/booking/cancel", {
+      const res = await axios.patch("/booking/cancel", {
         bookingIds: cancelTarget.bookingIds,
       });
-      toast.success("Bokningen avbokad ✅");
-      setCancelPopupOpen(false);
-      setCancelTarget(null);
-      loadBookings();
+
+      const refunded = res.data?.refunded;
+      const failed = res.data?.failedRefunds || [];
+
+      if (refunded?.count > 0) {
+        toast.success(
+          `Avbokad ✅ Återbetalat ${Math.round(refunded.total || 0)} ${cancelTarget.currency || "SEK"}`,
+        );
+      } else {
+        toast.success("Bokningen avbokad ✅");
+      }
+
+      if (failed.length > 0) {
+        toast.error(
+          `Vissa återbetalningar misslyckades (${failed.length} st). Försök igen eller kolla Stripe.`,
+        );
+      }
     } catch (e) {
       toast.error(e?.response?.data?.message || "Kunde inte avboka");
     } finally {
@@ -1036,13 +1048,15 @@ const Admin = () => {
                   });
 
                   const paymentLabel =
-                    b.paymentStatus === "paid"
-                      ? b.paymentMethod === "onsite"
-                        ? "Betald (på plats)"
-                        : "Betald (online)"
-                      : b.paymentMethod === "onsite"
-                        ? "Obetald (på plats)"
-                        : "Obetald";
+                    b.paymentStatus === "refunded"
+                      ? "Återbetald (Stripe)"
+                      : b.paymentStatus === "paid"
+                        ? b.paymentMethod === "onsite"
+                          ? "Betald (på plats)"
+                          : "Betald (online)"
+                        : b.paymentMethod === "onsite"
+                          ? "Obetald (på plats)"
+                          : "Obetald";
 
                   return (
                     <div
@@ -1092,7 +1106,11 @@ const Admin = () => {
                       <div>
                         <span
                           className={`status-pill ${
-                            b.paymentStatus === "paid" ? "paid" : "unpaid"
+                            b.paymentStatus === "refunded"
+                              ? "refunded"
+                              : b.paymentStatus === "paid"
+                                ? "paid"
+                                : "unpaid"
                           }`}
                         >
                           {paymentLabel}
@@ -2100,9 +2118,11 @@ const Admin = () => {
                 <div className="booking-value">
                   <span
                     className={`status-pill ${
-                      bookingTarget?.paymentStatus === "paid"
-                        ? "paid"
-                        : "unpaid"
+                      b.paymentStatus === "refunded"
+                        ? "refunded"
+                        : b.paymentStatus === "paid"
+                          ? "paid"
+                          : "unpaid"
                     }`}
                   >
                     {bookingTarget?.paymentStatus === "paid"

@@ -24,6 +24,13 @@ app.use(
   }),
 );
 
+// Måste ligga före express.json
+app.post(
+  "/payment/webhook",
+  express.raw({ type: "application/json" }),
+  require("./controllers/paymentController").webhook,
+);
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));
@@ -36,6 +43,7 @@ app.use("/activity", require("./routes/activityRoutes"));
 app.use("/booking", require("./routes/bookingRoutes"));
 app.use("/upload", require("./routes/uploadRoutes"));
 app.use("/stats", require("./routes/statsRoutes"));
+app.use("/payment", require("./routes/paymentRoutes"));
 
 // Start the server
 app.listen(6969, () => {

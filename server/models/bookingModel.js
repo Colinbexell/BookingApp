@@ -47,7 +47,7 @@ const bookingSchema = new Schema(
     // Betalning
     paymentStatus: {
       type: String,
-      enum: ["unpaid", "paid"],
+      enum: ["unpaid", "paid", "refunded"],
       default: "unpaid",
       index: true,
     },
@@ -56,12 +56,22 @@ const bookingSchema = new Schema(
       enum: ["onsite", "online"],
       required: true, // onsite = betala på plats, online = betala direkt
     },
+    // Stripe (för onlinebetalning)
+    paymentGroupId: { type: String, index: true }, // grupp för en hel "checkout"
+    stripeCheckoutSessionId: { type: String, index: true },
+    stripePaymentIntentId: { type: String, index: true },
+    paymentExpiresAt: { type: Date, index: true },
+    //  Refund-spårning (för betalda avbokningar)
+    stripeRefundId: { type: String, index: true },
+    refundAmount: { type: Number, default: 0 }, // i "major units" (t.ex. SEK)
+    refundStatus: { type: String }, // pending|succeeded|failed
+    refundedAt: { type: Date },
 
     currency: { type: String, default: "SEK" },
     unitPrices: { type: [Number], default: [] }, // pris per slot i bokningen
     totalPrice: { type: Number, default: 0 },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 module.exports = mongoose.model("Booking", bookingSchema);

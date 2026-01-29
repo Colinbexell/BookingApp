@@ -1,6 +1,7 @@
 const Booking = require("../models/bookingModel");
 const Activity = require("../models/activityModel");
 const mongoose = require("mongoose");
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 // --- basic YYYY-MM-DD validator ---
 const isValidDateISO = (s) =>
@@ -226,11 +227,9 @@ const createBooking = async (req, res) => {
       partySize: ps,
 
       paymentMethod: isPaid ? paymentMethod : "onsite",
-      paymentStatus: isPaid
-        ? paymentMethod === "online"
-          ? "paid"
-          : "unpaid"
-        : "paid",
+
+      // Online ska INTE bli paid här. Det sker via Stripe-webhook.
+      paymentStatus: isPaid ? "unpaid" : "paid",
 
       currency: act.pricingRules?.currency || "SEK",
       unitPrices: isPaid ? unitPrices : [],
@@ -383,12 +382,94 @@ const cancelBookings = async (req, res) => {
 
     const ids = bookingIds.map((id) => new mongoose.Types.ObjectId(id));
 
-    const result = await Booking.updateMany(
-      { _id: { $in: ids } },
-      { $set: { status: "cancelled" } },
-    );
+    // 1) Hämta bokningarna (vi behöver totalPrice + stripePaymentIntentId)
+    const docs = await Booking.find({ _id: { $in: ids } });
 
-    return res.json({ ok: true, modified: result.modifiedCount });
+    let cancelledCount = 0;
+    let refundedCount = 0;
+    let refundedTotal = 0;
+    const failedRefunds = [];
+
+    for (const b of docs) {
+      // redan avbokad => hoppa
+      if (b.status === "cancelled") continue;
+
+      const isStripePaidOnline =
+        b.paymentMethod === "online" &&
+        b.paymentStatus === "paid" &&
+        !!b.stripePaymentIntentId;
+
+      // 2) Om betald online: skapa refund innan vi avbokar
+      if (isStripePaidOnline) {
+        // skydd mot dubbel-refund
+        if (b.stripeRefundId) {
+          await Booking.updateOne(
+            { _id: b._id },
+            { $set: { status: "cancelled" } },
+          );
+          cancelledCount += 1;
+          continue;
+        }
+
+        const amountMinor = Math.round(Number(b.totalPrice || 0) * 100);
+
+        try {
+          const refund = await stripe.refunds.create(
+            {
+              payment_intent: b.stripePaymentIntentId,
+              ...(amountMinor > 0 ? { amount: amountMinor } : {}),
+              reason: "requested_by_customer",
+              metadata: {
+                bookingId: String(b._id),
+                workshopId: String(b.workshopId),
+              },
+            },
+            { idempotencyKey: `refund_booking_${b._id}` },
+          );
+
+          await Booking.updateOne(
+            { _id: b._id },
+            {
+              $set: {
+                status: "cancelled",
+                paymentStatus: "refunded",
+                stripeRefundId: refund.id,
+                refundAmount: Number(b.totalPrice || 0),
+                refundStatus: refund.status,
+                refundedAt: new Date(),
+              },
+            },
+          );
+
+          cancelledCount += 1;
+          refundedCount += 1;
+          refundedTotal += Number(b.totalPrice || 0);
+        } catch (err) {
+          failedRefunds.push({ bookingId: String(b._id), error: err.message });
+          // Låt bokningen vara aktiv om refund failar
+          continue;
+        }
+
+        continue;
+      }
+
+      // 3) Onsite/obetald => bara avboka
+      await Booking.updateOne(
+        { _id: b._id },
+        { $set: { status: "cancelled" } },
+      );
+      cancelledCount += 1;
+    }
+
+    return res.json({
+      ok: true,
+      cancelledCount,
+      refunded: {
+        count: refundedCount,
+        total: Math.round(refundedTotal * 100) / 100,
+      },
+      failedRefunds,
+    });
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });
   }

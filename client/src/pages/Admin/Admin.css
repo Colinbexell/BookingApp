@@ -132,9 +132,8 @@
 
 @media (max-width: 1200px) {
   .act-div {
-  grid-template-columns: repeat(2, minmax(220px, 1fr));
- 
-}
+    grid-template-columns: repeat(2, minmax(220px, 1fr));
+  }
 }
 
 /* -----------------------------
@@ -553,14 +552,14 @@
 .bookings-row {
   display: grid;
   grid-template-columns:
-    1.2fr   /* Datum */
-    0.8fr   /* Tid */
-    1.6fr   /* Namn */
-    0.8fr   /* Tjänst */
-    0.9fr   /* Pris */
-    0.8fr   /* Betalning ⬅ MER PLATS */
-    1.4fr   /* Status */
-    0.8fr;  /* Åtgärder */
+    1.2fr /* Datum */
+    0.8fr /* Tid */
+    1.6fr /* Namn */
+    0.8fr /* Tjänst */
+    0.9fr /* Pris */
+    0.8fr /* Betalning ⬅ MER PLATS */
+    1.4fr /* Status */
+    0.8fr; /* Åtgärder */
   gap: 12px;
   align-items: center;
 
@@ -642,6 +641,12 @@
 .status-pill.unpaid {
   background: var(--red);
   border: 1px solid var(--red-border);
+  color: rgba(0, 0, 0, 0.85);
+}
+
+.status-pill.refunded {
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(59, 130, 246, 0.28);
   color: rgba(0, 0, 0, 0.85);
 }
 
@@ -856,22 +861,19 @@
 }
 
 /* Trash / ta bort knapp */
-.trash{
+.trash {
   height: 25px;
   cursor: pointer;
-  transition: all ease-in-out .1s;
-
-
+  transition: all ease-in-out 0.1s;
 }
 
-.trash:hover{
+.trash:hover {
   transform: scale(1.05);
 }
 
-.trash img{
+.trash img {
   height: 90%;
 }
-
 
 /* -----------------------------
    Bookings: responsive fix (laptops)
@@ -879,8 +881,6 @@
 
 /* 1) Lite tajtare UI på mindre laptops */
 @media (max-width: 1400px) {
-  
-
   .bookings-controls {
     gap: 8px;
   }
@@ -938,4 +938,3 @@
     min-width: 1000px;
   }
 }
-
