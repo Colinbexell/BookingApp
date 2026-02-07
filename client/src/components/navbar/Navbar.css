@@ -23,7 +23,12 @@
 }
 
 .logo {
-  width: 20vw;
+  width: auto;
+  height: 100%;
+  cursor: pointer;
+}
+
+.logo img {
   height: 100%;
 }
 
@@ -43,13 +48,21 @@
 
 .nav_buttons a {
   font-size: large;
+  font-weight: 700;
+  letter-spacing: 1px;
   color: var(--text);
   transition: all ease-in-out 0.2s;
   width: auto;
 }
 
 .nav_buttons a:hover {
-  color: var(--primary);
+  background: var(--web-primary-gradient);
+
+  -webkit-background-clip: text;
+  background-clip: text;
+
+  -webkit-text-fill-color: transparent;
+  color: transparent;
   transform: scale(1.1);
 }
 
@@ -151,7 +164,9 @@
   .menu_active a {
     padding: 15px 30px;
     font-size: 1.2rem;
-    color: var(--text-dark);
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--text);
     text-decoration: none;
     transition: all ease-in-out 0.2s;
     border-bottom: 1px solid #0000001d;
@@ -159,7 +174,13 @@
 
   .menu a:hover,
   .menu_active a:hover {
-    color: var(--primary);
+    background: var(--web-primary-gradient);
+
+    -webkit-background-clip: text;
+    background-clip: text;
+
+    -webkit-text-fill-color: transparent;
+    color: transparent;
     background-color: rgba(255, 255, 255, 0.05);
   }
 }

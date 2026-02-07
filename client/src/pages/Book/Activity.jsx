@@ -15,12 +15,12 @@ const Activity = ({
   partyRules,
 }) => {
   return (
-    <div className="main_card">
-      <img
-        src={img?.startsWith("http") ? img : img ? API_BASE_URL + img : ""}
-        alt={title}
-      />
-
+    <div
+      className="main_card"
+      style={{
+        backgroundImage: `url(${img?.startsWith("http") ? img : img ? API_BASE_URL + img : ""})`,
+      }}
+    >
       <h3>{title}</h3>
       <div className="card-expand">
         <p className="info">{info}</p>

@@ -107,7 +107,7 @@
   border-radius: 14px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: white;
-  color: var(--text-dark);
+  color: var(--text);
   font-family: inherit;
 }
 
@@ -199,7 +199,7 @@
 
 .new-act-input input {
   width: 100%;
-  color: var(--text-dark);
+  color: var(--text);
 }
 
 .pricing-card {
@@ -303,7 +303,7 @@
   border-radius: 14px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: white;
-  color: var(--text-dark);
+  color: var(--text);
   font-family: inherit;
 }
 
@@ -363,7 +363,7 @@
   border-radius: 14px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: white;
-  color: var(--text-dark);
+  color: var(--text);
   font-family: inherit;
 }
 
@@ -541,7 +541,7 @@
   border-radius: 14px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: white;
-  color: var(--text-dark);
+  color: var(--text);
 }
 
 .bookings-table {
@@ -588,7 +588,7 @@
   border-radius: 14px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: white;
-  color: var(--text-dark);
+  color: var(--text);
   min-width: 190px;
   font-family: inherit;
   font-weight: 700;
@@ -600,7 +600,7 @@
   border-radius: 14px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: white;
-  color: var(--text-dark);
+  color: var(--text);
   min-width: 260px;
 }
 

@@ -8,7 +8,12 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: var(--background);
+  /* background-color: var(--background); */
+  background-image: url("/src/assets/web/Background.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -18,13 +23,13 @@
 
   scrollbar-width: none;
 
-  /* Colors */
+  /* Colors admin */
   --primary: #2eeabb;
   --primary-shadow: #2eeabb53;
   --secondary: #27cca4;
-  --background: #ebebebff;
-  --background-secondary: #d9d9d9ff;
-  --text-dark: #12151c;
+  --background: rgb(32, 32, 30);
+  --background-secondary: rgb(49, 49, 49);
+  --text: #12151c;
   --text: #ffffff;
   --shadow: #00000029;
   --dot-brightness: 1;
@@ -39,6 +44,14 @@
   --red-border: rgba(255, 90, 90, 0.45);
   --red: rgba(255, 90, 90, 0.14);
   --navbar: #161616c5;
+
+  --web-primary: #cdb131;
+  --web-primary-gradient: linear-gradient(90deg, #814802, #ffe386);
+  --web-secondary-gradient: linear-gradient(360deg, #814802, #ffe386);
+  --web-primary-shadow: #d7b93353;
+  --web-text: #ffffff;
+  --web-text-muted: rgba(255, 255, 255, 0.7);
+  --web-lines: rgba(255, 255, 255, 0.12);
 }
 
 /* Remove overflow hidden from root - let body scroll */
@@ -60,60 +73,6 @@ body {
   font-family: inherit;
 
   position: relative;
-  background-color: var(--background);
-  transition: background-color 1s ease-in-out;
-}
-
-.main-home {
-  width: 100%;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: start;
-
-  font-family: inherit;
-
-  position: relative;
-  background-color: var(--background);
-  transition: background-color 1s ease-in-out;
-}
-
-/* Dot pattern background - absolute positioned, moves with content */
-.main-home::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-
-  width: 100%;
-  height: 500%;
-
-  --bg: radial-gradient(var(--background-secondary) 8%, transparent 9%);
-
-  --size: 4rem;
-
-  background-image: radial-gradient(
-      var(--background-secondary) 8%,
-      transparent 9%
-    ),
-    radial-gradient(var(--background-secondary) 8%, transparent 9%);
-
-  background-position: 0 0, calc(var(--size) / 2) calc(var(--size) / 2);
-
-  background-size: var(--size) var(--size);
-
-  filter: brightness(var(--dot-brightness));
-  transition: filter 0.6s ease-in-out;
-
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* Content over dots */
-.main-home > * {
-  position: relative;
-  z-index: 1;
 }
 
 .popup {
@@ -131,10 +90,16 @@ body {
   cursor: pointer;
   backdrop-filter: blur(2px);
 }
-
-.section {
+.display {
   width: 100%;
-  min-height: 50vh;
+  margin-top: 9vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+section {
+  width: 100%;
   padding: 40px 20px;
 
   display: flex;
@@ -147,7 +112,7 @@ body {
   width: 100vw;
   height: 40vh;
   object-fit: cover;
-  filter: blur(1.5px);
+  /* filter: blur(1.5px); */
 }
 
 /* Utility classes */
@@ -166,7 +131,7 @@ input {
   border: none;
   border-radius: 5px;
   background-color: var(--lines);
-  color: var(--text-dark);
+  color: var(--text);
   font-size: 16px;
   margin-top: 1.5vh;
   transition: all ease-in-out 0.1s;
@@ -212,27 +177,59 @@ a {
   text-decoration: inherit;
 }
 
+.txt-link {
+  color: var(--web-primary);
+  font-weight: 700;
+  letter-spacing: 1px;
+  transition: all ease-in-out 0.2s;
+}
+
 p,
 label,
 span,
 div,
 textarea,
 strong {
-  color: var(--text-dark);
+  color: var(--text);
 }
 
 h1 {
   font-size: 2.8em;
   line-height: 1.1;
-  color: var(--text-dark);
+  color: var(--text);
 }
 
 h2 {
   font-size: 2em;
   line-height: 1.1;
-  color: var(--text-dark);
+  color: var(--text);
 }
 
 h3 {
-  color: var(--text-dark);
+  color: var(--text);
+}
+
+h4 {
+  background: var(--web-secondary-gradient);
+
+  -webkit-background-clip: text;
+  background-clip: text;
+
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  margin: 0;
+  padding: 0;
+}
+
+h5 {
+  color: var(--text);
+  font-size: 1.2rem;
+  font-weight: 400;
+  text-align: center;
+  letter-spacing: 0.7px;
+  margin: 0;
 }

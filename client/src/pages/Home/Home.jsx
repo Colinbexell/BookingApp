@@ -3,17 +3,12 @@ import "./Home.css";
 import Lenis from "lenis";
 import Navbar from "../../components/navbar/Navbar";
 
-import BowlingBG from "../../assets/BowlingBG.jpg";
+import Logo from "../../assets/web/Logo.png";
 
 const Home = () => {
   localStorage.clear();
   const mainRef = useRef(null);
-  const s1 = useRef(null);
-  const s2 = useRef(null);
-  const s3 = useRef(null);
-  const s4 = useRef(null);
   const lenisRef = useRef(null);
-  const [scrollPos, setScrollPos] = useState(0);
 
   // Smooth scroll setup with Lenis
   useEffect(() => {
@@ -49,92 +44,23 @@ const Home = () => {
     };
   }, []);
 
-  // Background color change based on scroll position
-  useEffect(() => {
-    const sections = [
-      { el: s1.current, bg: "#ebebebff", secondary: "#d9d9d9ff" },
-      { el: s2.current, bg: "#ebebebff", secondary: "#d9d9d9ff" },
-      { el: s3.current, bg: "#22333B", secondary: "#1e2d34ff" },
-      { el: s4.current, bg: "#211A1E", secondary: "#2a2126ff" },
-    ].filter((s) => s.el);
-
-    if (!mainRef.current || sections.length === 0) return;
-
-    let currentIndex = -1;
-
-    const update = () => {
-      // Use window for viewport
-      const viewportMidY = window.innerHeight / 2;
-
-      let bestIndex = 0;
-      let bestDist = Infinity;
-
-      for (let i = 0; i < sections.length; i++) {
-        const rect = sections[i].el.getBoundingClientRect();
-        const midY = rect.top + rect.height / 2;
-        const dist = Math.abs(midY - viewportMidY);
-
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestIndex = i;
-        }
-      }
-
-      if (bestIndex !== currentIndex) {
-        currentIndex = bestIndex;
-        document.documentElement.style.setProperty(
-          "--background",
-          sections[bestIndex].bg
-        );
-        document.documentElement.style.setProperty(
-          "--background-secondary",
-          sections[bestIndex].secondary
-        );
-        document.documentElement.style.setProperty("--dot-brightness", "1.15");
-
-        setTimeout(() => {
-          document.documentElement.style.setProperty("--dot-brightness", "1");
-        }, 100);
-      }
-    };
-
-    // Initial update
-    update();
-
-    // Update on scroll position change
-    update();
-  }, [scrollPos]);
-
   return (
-    <div className="main-home" ref={mainRef}>
+    <div className="main" ref={mainRef}>
       <Navbar />
-      <div className="section" ref={s1}>
-        <img className="top_img" src={BowlingBG} alt="" />
-        <h1>Section 1</h1>
-        <p>
-          Welcome to the first section. Scroll down to see the smooth
-          transitions.
-        </p>
-      </div>
-
-      <div className="section" ref={s2}>
-        <h1>Section 2</h1>
-        <p>
-          This section has a light background with smooth color transitions.
-        </p>
-      </div>
-
-      <div className="section" ref={s3}>
-        <h1>Section 3</h1>
-        <p>A vibrant yellow section. The dot pattern moves with your scroll.</p>
-      </div>
-
-      <div className="section" ref={s4}>
-        <h1>Section 4</h1>
-        <p>
-          The final section with a dark elegant background. Thanks for
-          scrolling!
-        </p>
+      <div className="display">
+        <section>
+          <img className="top-logo" src={Logo} alt="" />
+          <h4>VÄLKOMMEN</h4>
+          <h5 className="top-h5">
+            Bowla med vänner och familj i vår toppmoderna bowlinghall. Oavsett
+            om du är en erfaren spelare eller nybörjare, erbjuder vi en rolig
+            och avslappnad atmosfär för alla. Boka din bana idag och upplev
+            spänningen i varje kast!
+          </h5>
+        </section>
+        <section>
+          <h4>VÅRA AKTIVITETER</h4>
+        </section>
       </div>
     </div>
   );

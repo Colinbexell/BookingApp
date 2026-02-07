@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import "./Navbar.css";
 import MenuIcon from "../../assets/MenuIcon.png";
 
+import Logo from "../../assets/web/Logo.png";
+
 const Navbar = () => {
   const [menuActive, setmenuActive] = useState(false);
 
@@ -23,15 +25,13 @@ const Navbar = () => {
 
   return (
     <div className="nav">
-      <div className="logo">
-        <img src="" alt="" />
-      </div>
+      <a className="logo" href="/">
+        <img src={Logo} alt="Logo" />
+      </a>
       <div className="nav_buttons">
-        <a href="/book">Boka</a>
-        <a href="#s1">Section 1</a>
-        <a href="#s2">Section 2</a>
-        <a href="#s3">Section 3</a>
-        <a href="#s4">Section 4</a>
+        <a href="/book">BOKA</a>
+        <a href="#s2">ÖPPETTIDER</a>
+        <a href="#s3">KONTAKT</a>
       </div>
 
       <div className="nav_mobile">
@@ -53,21 +53,9 @@ const Navbar = () => {
           className={menuActive ? "menu_active" : "menu"}
           onClick={(e) => e.stopPropagation()}
         >
-          <a href="/book" onClick={() => setmenuActive(false)}>
-            Boka
-          </a>
-          <a href="#s1" onClick={() => setmenuActive(false)}>
-            Section 1
-          </a>
-          <a href="#s2" onClick={() => setmenuActive(false)}>
-            Section 2
-          </a>
-          <a href="#s3" onClick={() => setmenuActive(false)}>
-            Section 3
-          </a>
-          <a href="#s4" onClick={() => setmenuActive(false)}>
-            Section 4
-          </a>
+          <a href="/book">BOKA</a>
+          <a href="#s2">ÖPPETTIDER</a>
+          <a href="#s3">KONTAKT</a>
         </div>
       </div>
     </div>

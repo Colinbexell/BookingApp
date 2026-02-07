@@ -35,13 +35,13 @@
 }
 
 .act_card h3 {
-  color: var(--text-dark);
+  color: var(--text);
   font-weight: 600;
   font-size: large;
 }
 
 .act_card p {
-  color: var(--text-dark);
+  color: var(--text);
   font-weight: 600;
   font-size: small;
 }

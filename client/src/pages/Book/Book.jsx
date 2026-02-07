@@ -755,6 +755,12 @@ const Home = () => {
         return (
           <div className="content booking-page">
             <div className="booking-header">
+              <div>
+                <h1 className="booking-title">Välj tid</h1>
+                <p className="booking-subtitle">
+                  Välj tider för de aktiviteter du lagt i din bokning.
+                </p>
+              </div>
               <div className="booking-datebox">
                 <div className="datebox-label">Datum</div>
                 <div className="datebox-controls">
@@ -771,14 +777,6 @@ const Home = () => {
                     Uppdatera
                   </button>
                 </div>
-              </div>
-
-              <div>
-                <h1 className="booking-title">Välj tid</h1>
-                <p className="booking-subtitle">
-                  Välj tider för de aktiviteter du lagt i din bokning. 2h kräver
-                  två tider i rad.
-                </p>
               </div>
             </div>
 
@@ -1368,8 +1366,9 @@ const Home = () => {
                   </div>
 
                   <div className="hint">
-                    Du får en bokningsbekräftelse i systemet efter att bokningen
-                    gått igenom.
+                    Du får en bokningsbekräftelse på mail när du bokar, väljer
+                    du att betala på plats måste du verifiera din bokning via
+                    mail för att säkra din bokning.
                   </div>
                 </div>
               </div>
