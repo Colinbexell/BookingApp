@@ -5,3 +5,34 @@
 .top-h5 {
   width: 70%;
 }
+
+.top-section {
+  background-image: url("../../assets/web/TopBG.webp");
+  background-size: cover;
+  background-position: center;
+  height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: end;
+}
+
+.top-button {
+  height: 60px;
+  width: 180px;
+  border: 2px solid white;
+  border-radius: 35px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  transition: all 0.2s ease-in-out;
+}
+
+.top-button:hover {
+  color: black;
+  background-color: white;
+  font-weight: 800;
+  transform: scale(1.1);
+  box-shadow: 0 8px 24px rgba(255, 255, 255, 0.214);
+}

@@ -1744,13 +1744,13 @@ const Admin = () => {
             <div className="pricing-card">
               <h3 className="pricing-title">Prissättning</h3>
               <p className="admin-muted pricing-subtitle">
-                Default gäller om ingen regel matchar. Veckoregler kan ge olika
-                pris per tid och dag.
+                Standard gäller om inga specialpriser är satta för en dag eller
+                tid.
               </p>
 
               <div className="admin-row admin-row-half pricing-default-row">
                 <div className="admin-field pricing-default-field">
-                  <p>Default (kr/timme)</p>
+                  <p>Standard (kr / timme )</p>
                   <input
                     type="number"
                     min="0"
@@ -1775,7 +1775,7 @@ const Admin = () => {
 
                     {d.ranges.length === 0 ? (
                       <p className="admin-muted pricing-empty">
-                        Inga regler (defaultpris används)
+                        Inga specialpriser (Standardpris gäller hela dagen)
                       </p>
                     ) : (
                       <div className="exceptions-list pricing-ranges">
@@ -1859,9 +1859,9 @@ const Admin = () => {
               )}
             </div>
 
-            <div className="admin-row admin-row-half admin-row-gap-md admin-row-top-md">
+            <div className="new-act-row">
               <div className="admin-field">
-                <p>Banor</p>
+                <p>Antalet banor / personal</p>
                 <input
                   type="number"
                   min="1"
@@ -1871,7 +1871,7 @@ const Admin = () => {
               </div>
 
               <div className="admin-field">
-                <p>Slot (min)</p>
+                <p>Varaktighet (minuter)</p>
                 <input
                   type="number"
                   min="15"
@@ -1881,7 +1881,7 @@ const Admin = () => {
                 />
               </div>
             </div>
-            <div className="form-row">
+            <div className="new-act-row">
               <label>Tar aktiviteten betalt?</label>
               <select
                 value={takesPayment ? "yes" : "no"}
@@ -1892,7 +1892,7 @@ const Admin = () => {
               </select>
             </div>
 
-            <div className="form-row">
+            <div className="new-act-row">
               <label>Bokas / debiteras per</label>
               <select
                 value={bookingUnit}
@@ -1927,7 +1927,7 @@ const Admin = () => {
               </div>
             )}
 
-            <div className="admin-row admin-row-half admin-row-gap-md admin-row-top-md">
+            <div className="new-act-row">
               <div className="admin-field">
                 <p>Min timmar</p>
                 <input
@@ -1951,18 +1951,18 @@ const Admin = () => {
               </div>
             </div>
 
-            <div className="admin-row admin-row-half admin-row-top-lg">
+            <div className="new-act-row">
               <label className="admin-checkbox-row">
                 <input
                   type="checkbox"
                   checked={useWorkshopAvailability}
                   onChange={(e) => setUseWorkshopAvailability(e.target.checked)}
                 />
-                Använd workshopens öppettider (rekommenderas)
+                Använd nuvarande öppettider (rekommenderas)
               </label>
             </div>
 
-            <div className="admin-row admin-row-half admin-row-top-xl admin-actions-row">
+            <div className="new-act-footer">
               <button
                 className="admin-btn danger"
                 onClick={() => setNewActPopupVisible(false)}

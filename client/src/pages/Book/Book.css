@@ -55,7 +55,6 @@
   min-height: 60vh;
   height: auto;
   width: 80vw;
-
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -68,30 +67,24 @@
   width: 100%;
   height: auto;
   margin-top: 10vh;
-
   display: grid;
   gap: 20px;
-
-  /* Default: stora skärmar -> 4 kort per rad */
   grid-template-columns: repeat(5, minmax(0, 1fr));
   align-items: start;
 }
 
-/* Laptop -> 3 per rad */
 @media (max-width: 1400px) {
   .activities {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
-/* Mindre laptop -> 2 per rad */
 @media (max-width: 1100px) {
   .activities {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
-/* Mobil -> 1 per rad */
 @media (max-width: 700px) {
   .activities {
     grid-template-columns: 1fr;
@@ -101,18 +94,16 @@
 /* ===== Gör korten lika stora (override från Activity.css) ===== */
 .activities .main_card {
   width: 100%;
-  height: 360px; /* Justera om du vill ha högre/lägre */
+  height: 360px;
   align-self: stretch;
 }
 
-/* Bilden får en stabil höjd inom kortet */
 .activities .main_card img {
   width: 90%;
-  height: 70%; /* matchar din card-height snyggt */
+  height: 70%;
   object-fit: cover;
 }
 
-/* Titel tar inte över kortet om den blir lång */
 .activities .main_card h3 {
   min-height: 40px;
   display: -webkit-box;
@@ -121,182 +112,7 @@
   overflow: hidden;
 }
 
-/* Välj tid */
-.booking-summary {
-  width: 300px;
-  height: auto;
-  box-shadow: 0 3px 10px 6px var(--web-primary-shadow);
-  border-radius: var(--border-radius);
-  padding: 10px;
-}
-
-.summary-item {
-  width: 100%;
-}
-
-.summary-item div {
-  display: flex;
-  width: 95%;
-  justify-content: space-between;
-}
-
-.booking-summary h3 {
-  font-size: medium;
-}
-
-/* Tider */
-
-.time-col {
-  height: auto;
-  max-height: 80vh;
-
-  width: 60vw;
-  overflow-y: scroll;
-  scrollbar-width: none;
-  padding: 30px;
-  align-items: start;
-  justify-content: center;
-}
-
-.time {
-  box-shadow: 0 3px 10px 6px var(--shadow);
-  width: 90%;
-  height: 65px;
-  padding: 10px;
-  border-radius: var(--border-radius);
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-@media (max-width: 768px) {
-  .activities {
-    flex-direction: column;
-    align-items: center;
-    justify-content: start;
-  }
-}
-
-/*  */
-
-.booking-top {
-  width: 100%;
-  display: flex;
-  gap: 20px;
-  align-items: start;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.time-panel {
-  width: 60vw;
-  min-width: 320px;
-  max-height: 80vh;
-  overflow-y: auto;
-  scrollbar-width: none;
-  padding: 20px;
-  border-radius: var(--border-radius);
-  box-shadow: 0 3px 10px 6px var(--shadow);
-  background: var(--background);
-}
-
-.time-panel-header {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  position: sticky;
-  top: 0;
-  background: var(--background);
-  padding-bottom: 12px;
-  margin-bottom: 12px;
-  z-index: 2;
-}
-
-.time-activity-block {
-  border-top: 1px solid var(--web-lines);
-  padding-top: 14px;
-  margin-top: 14px;
-}
-
-.time-activity-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.slots-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.slot-card {
-  border-radius: var(--border-radius);
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid var(--web-lines);
-}
-
-.slot-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
-}
-
-.pill {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.pill.ok {
-  background: rgba(0, 200, 0, 0.12);
-}
-
-.pill.bad {
-  background: rgba(200, 0, 0, 0.12);
-}
-
-.slot-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.slot-actions button {
-  flex: 1;
-  height: 36px;
-  border-radius: 12px;
-  border: none;
-  cursor: pointer;
-  background: var(--web-primary);
-  color: white;
-}
-
-.slot-actions button:disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
-}
-
-.selected-slot-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: center;
-  margin-top: 6px;
-}
-
-@media (max-width: 1000px) {
-  .slots-grid {
-    grid-template-columns: repeat(2, minmax(140px, 1fr));
-  }
-}
-
+/* ===== Booking layout ===== */
 .booking-page {
   width: 100%;
   height: 100%;
@@ -390,6 +206,7 @@
   opacity: 0.75;
 }
 
+/* ===== Legend ===== */
 .legend {
   display: flex;
   gap: 10px;
@@ -421,6 +238,7 @@
   background: rgba(220, 0, 0, 0.7);
 }
 
+/* ===== Helper ===== */
 .helper-card {
   background: rgba(0, 0, 0, 0.03);
   border: 1px solid var(--web-lines);
@@ -442,6 +260,7 @@
   opacity: 0.8;
 }
 
+/* ===== Activity blocks (page 2 left) ===== */
 .activity-block {
   padding-top: 14px;
   margin-top: 14px;
@@ -460,22 +279,6 @@
   margin: 0;
 }
 
-.need-box {
-  display: flex;
-  gap: 10px;
-  background: rgba(0, 0, 0, 0.03);
-  border: 1px solid var(--web-lines);
-  border-radius: 14px;
-  padding: 10px;
-}
-
-.need-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 90px;
-}
-
 .empty-state {
   margin-top: 12px;
   padding: 12px;
@@ -484,91 +287,107 @@
   border: 1px dashed var(--web-lines);
 }
 
-.slots-grid {
+/* =========================
+   Week calendar (image vibe)
+========================= */
+.week-calendar {
+  width: 100%;
   display: grid;
-  grid-template-columns: repeat(4, minmax(150px, 1fr));
-  gap: 12px;
-  margin-top: 12px;
+  grid-template-columns: repeat(7, 1fr);
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--background);
 }
 
-.slot-card {
-  border-radius: var(--border-radius);
-  border: 1px solid var(--web-lines);
-  background: rgba(0, 0, 0, 0.03);
-  padding: 12px;
-}
-
-.slot-card-disabled {
-  opacity: 0.6;
-}
-
-.slot-top {
+.week-day {
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 10px;
+  min-height: 220px;
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.slot-time {
-  font-weight: 800;
-}
-
-.chip {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--web-lines);
-}
-
-.chip-green {
-  background: rgba(0, 170, 0, 0.12);
-}
-.chip-yellow {
-  background: rgba(220, 170, 0, 0.14);
-}
-.chip-red {
-  background: rgba(220, 0, 0, 0.12);
-}
-
-.slot-buttons {
-  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.btn {
-  height: 40px;
-  padding: 0 14px;
-  border-radius: 14px;
-  border: none;
-  cursor: pointer;
-  background: var(--web-primary);
-  color: var(--web-text);
-  font-weight: 700;
+.week-day-header {
+  font-weight: 900;
+  font-size: 13px;
+  opacity: 0.85;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
 }
 
-.btn:disabled {
+.week-day-empty {
+  opacity: 0.35;
+  font-weight: 800;
+  padding: 10px 0;
+  text-align: center;
+}
+
+.time-pill {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(46, 234, 187, 0.55);
+  background: rgba(46, 234, 187, 0.1);
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.12s ease,
+    background 0.12s ease;
+}
+
+.time-pill:hover {
+  transform: scale(1.03);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.1);
+}
+
+.time-pill:disabled {
   opacity: 0.35;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
-.btn-secondary {
-  background: var(--web-lines);
-  color: var(--web-text);
+.time-pill-time {
+  font-size: 13px;
 }
 
-.btn-ghost {
-  background: transparent;
-  color: var(--web-text);
-  border: 1px solid var(--web-lines);
-}
-
-.slot-foot {
-  margin-top: 10px;
+.time-pill-price {
   font-size: 12px;
+  opacity: 0.85;
 }
 
+.time-pill.is-ok {
+  border-color: rgba(46, 234, 187, 0.55);
+  background: rgba(46, 234, 187, 0.1);
+}
+
+.time-pill.is-low {
+  border-color: rgba(220, 170, 0, 0.55);
+  background: rgba(220, 170, 0, 0.12);
+}
+
+.time-pill.is-full {
+  border-color: rgba(255, 90, 90, 0.45);
+  background: rgba(255, 90, 90, 0.14);
+}
+
+.time-pill.selected {
+  border: 2px solid var(--primary);
+  background: rgba(46, 234, 187, 0.18);
+  box-shadow: 0 10px 30px rgba(46, 234, 187, 0.22);
+}
+
+/* ===== Right panel status + summary ===== */
 .status {
   padding: 6px 10px;
   border-radius: 999px;
@@ -580,6 +399,7 @@
 .status-ok {
   background: rgba(0, 170, 0, 0.12);
 }
+
 .status-warn {
   background: rgba(220, 170, 0, 0.14);
 }
@@ -602,22 +422,6 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 10px;
-}
-
-.summary-metrics {
-  display: flex;
-  gap: 10px;
-}
-
-.metric {
-  flex: 1;
-  border-radius: 14px;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid var(--web-lines);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
 
 .selected-list {
@@ -673,8 +477,35 @@
   line-height: 1.4;
 }
 
-/* Ange info sektion */
+/* ===== Buttons ===== */
+.btn {
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: none;
+  cursor: pointer;
+  background: var(--web-primary);
+  color: var(--web-text);
+  font-weight: 700;
+}
 
+.btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--web-lines);
+  color: var(--web-text);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--web-text);
+  border: 1px solid var(--web-lines);
+}
+
+/* ===== Page 3/4 layout ===== */
 .booking-grid-single {
   grid-template-columns: 1fr 0.7fr;
 }
@@ -715,6 +546,7 @@
   background-color: var(--background);
 }
 
+/* ===== Payment ===== */
 .payment-grid {
   display: grid;
   gap: 10px;
@@ -749,6 +581,7 @@
   font-size: 13px;
 }
 
+/* ===== Mini summary ===== */
 .mini-summary {
   display: grid;
   gap: 10px;

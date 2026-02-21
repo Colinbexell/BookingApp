@@ -10,7 +10,7 @@ import Register from "./pages/Authentication/Register";
 import Admin from "./pages/Admin/Admin";
 
 function App() {
-  localStorage.setItem("selectedWorkshopId", "695aa0f8e844dfb53f509446");
+  localStorage.setItem("selectedWorkshopId", "699987b90249daa5c2a43474");
   return (
     <>
       <Routes>

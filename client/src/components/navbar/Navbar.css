@@ -1,14 +1,13 @@
 .nav {
   width: 100vw;
   height: 9vh;
-  background-color: var(--navbar);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background-color: transparent;
+
   position: fixed;
   top: 0;
   left: 0;
   z-index: 999;
-  box-shadow: 0 3px 10px 6px #00000029;
+
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -20,6 +19,8 @@
 
 .nav.scrolled {
   height: 6vh;
+  background-color: var(--navbar);
+  box-shadow: 0 3px 3px 1px #00000018;
 }
 
 .logo {
@@ -50,7 +51,7 @@
   font-size: large;
   font-weight: 700;
   letter-spacing: 1px;
-  color: var(--text);
+  color: var(--web-text);
   transition: all ease-in-out 0.2s;
   width: auto;
 }
@@ -166,7 +167,7 @@
     font-size: 1.2rem;
     font-weight: 700;
     letter-spacing: 1px;
-    color: var(--text);
+    color: var(--web-text);
     text-decoration: none;
     transition: all ease-in-out 0.2s;
     border-bottom: 1px solid #0000001d;

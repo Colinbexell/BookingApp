@@ -1,7 +1,7 @@
 .sidebar-main {
   height: 100vh;
   width: 280px;
-  background: white;
+  background: var(--background-secondary);
   position: fixed;
   top: 0;
   left: 0;

@@ -29,9 +29,9 @@ const Navbar = () => {
         <img src={Logo} alt="Logo" />
       </a>
       <div className="nav_buttons">
-        <a href="/book">BOKA</a>
-        <a href="#s2">ÖPPETTIDER</a>
-        <a href="#s3">KONTAKT</a>
+        <a href="/book">Boka</a>
+        <a href="#s2">Öppettider</a>
+        <a href="#s3">Kontakt</a>
       </div>
 
       <div className="nav_mobile">
@@ -53,9 +53,9 @@ const Navbar = () => {
           className={menuActive ? "menu_active" : "menu"}
           onClick={(e) => e.stopPropagation()}
         >
-          <a href="/book">BOKA</a>
-          <a href="#s2">ÖPPETTIDER</a>
-          <a href="#s3">KONTAKT</a>
+          <a href="/book">Boka</a>
+          <a href="#s2">Öppettider</a>
+          <a href="#s3">Kontakt</a>
         </div>
       </div>
     </div>

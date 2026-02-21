@@ -16,6 +16,11 @@ const pad2 = (n) => String(n).padStart(2, "0");
 const toISODate = (d) =>
   `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 
+const isTodayISO = (dateISO) => {
+  const todayISO = toISODate(new Date());
+  return dateISO === todayISO;
+};
+
 const addDaysISO = (dateISO, days) => {
   const [y, m, d] = dateISO.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
@@ -23,15 +28,53 @@ const addDaysISO = (dateISO, days) => {
   return toISODate(dt);
 };
 
-const overlaps = (aStartISO, aSlots, bStartISO, bSlots, slotMinutes) => {
-  const aStart = new Date(aStartISO).getTime();
-  const bStart = new Date(bStartISO).getTime();
-  const aEnd = aStart + aSlots * slotMinutes * 60_000;
-  const bEnd = bStart + bSlots * slotMinutes * 60_000;
-  return aStart < bEnd && bStart < aEnd;
+const startOfWeekISO = (dateISO) => {
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  const day = dt.getDay(); // 0=sön, 1=mån...
+  const diffToMonday = (day === 0 ? -6 : 1) - day;
+  dt.setDate(dt.getDate() + diffToMonday);
+  return toISODate(dt);
 };
 
-const Home = () => {
+const timeLabelSV = (startISO) => {
+  const dt = new Date(startISO);
+  return dt.toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" });
+};
+
+const dayLabelSV = (dateISO) => {
+  const [y, m, d] = dateISO.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  const wd = dt.toLocaleDateString("sv-SE", { weekday: "short" });
+  return `${wd.charAt(0).toUpperCase()}${wd.slice(1)} ${d}`;
+};
+
+const buildWeekDaysFromSlots = (weekStartISO, slots) => {
+  const byDate = new Map();
+  for (const s of slots || []) {
+    const dateKey = String(s.startISO || "").slice(0, 10);
+    if (!byDate.has(dateKey)) byDate.set(dateKey, []);
+    byDate.get(dateKey).push(s);
+  }
+
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const dateISO = addDaysISO(weekStartISO, i);
+    const daySlots = (byDate.get(dateISO) || []).slice().sort((a, b) => {
+      return new Date(a.startISO).getTime() - new Date(b.startISO).getTime();
+    });
+
+    days.push({
+      date: dateISO,
+      label: dayLabelSV(dateISO),
+      slots: daySlots,
+    });
+  }
+
+  return days;
+};
+
+const Book = () => {
   const [page, setPage] = useState(1);
 
   const [selectedDate, setSelectedDate] = useState(() => toISODate(new Date()));
@@ -140,6 +183,14 @@ const Home = () => {
       setLoadingPaymentOptions(false);
     }
   };
+
+  const [nowTick, setNowTick] = useState(0);
+
+  useEffect(() => {
+    if (page !== 2) return;
+    const id = setInterval(() => setNowTick((x) => x + 1), 60_000);
+    return () => clearInterval(id);
+  }, [page]);
 
   useEffect(() => {
     loadActivities();
@@ -361,8 +412,9 @@ const Home = () => {
     try {
       setLoadingAvail(true);
 
-      const from = selectedDate;
-      const to = addDaysISO(selectedDate, 1); // exclusive day after
+      const weekStart = startOfWeekISO(selectedDate); // måndag
+      const from = weekStart;
+      const to = addDaysISO(weekStart, 7); // 7 dagar (exclusive)
 
       const results = await Promise.all(
         uniqueIds.map(async (id) => {
@@ -781,37 +833,7 @@ const Home = () => {
             </div>
 
             <div className="booking-grid">
-              {/* LEFT */}
               <div className="panel">
-                <div className="panel-header">
-                  <h2 className="panel-title">Lediga tider</h2>
-
-                  <div className="legend">
-                    <div className="legend-item">
-                      <span className="dot dot-green" />
-                      <span>Ledigt</span>
-                    </div>
-                    <div className="legend-item">
-                      <span className="dot dot-yellow" />
-                      <span>Få kvar</span>
-                    </div>
-                    <div className="legend-item">
-                      <span className="dot dot-red" />
-                      <span>Fullt</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="helper-card">
-                  <div className="helper-row">
-                    <div className="helper-title">Banor</div>
-                    <div className="helper-text">
-                      För att boka flera banor krävs det att välja exempelvis 2
-                      styck 1 timmes.
-                    </div>
-                  </div>
-                </div>
-
                 {loadingAvail ? (
                   <p className="muted">Laddar tider...</p>
                 ) : (
@@ -838,17 +860,6 @@ const Home = () => {
                               Antal banor: <strong>{activity.tracks}</strong>
                             </p>
                           </div>
-
-                          {/* <div className="need-box">
-                            <div className="need-item">
-                              <span className="muted">Behöver 1h</span>
-                              <strong>{Math.max(0, need1 - sel1)}</strong>
-                            </div>
-                            <div className="need-item">
-                              <span className="muted">Behöver 2h</span>
-                              <strong>{Math.max(0, need2 - sel2)}</strong>
-                            </div>
-                          </div> */}
                         </div>
 
                         {slots.length === 0 ? (
@@ -856,135 +867,150 @@ const Home = () => {
                             Inga tider denna dag (stängt eller undantag).
                           </div>
                         ) : (
-                          <div className="slots-grid">
-                            {slots.map((slot, idx) => {
-                              const usedInCart = takenCountInCartForSlot(
-                                activity.id,
-                                slot.startISO,
-                                av?.slotMinutes || 60,
-                              );
+                          (() => {
+                            const weekStart = startOfWeekISO(selectedDate);
+                            const rawWeekDays = buildWeekDaysFromSlots(
+                              weekStart,
+                              slots,
+                            );
 
-                              const basePrice1 = Number(slot.slotPrice || 0);
+                            const todayISO = toISODate(new Date());
+                            const todayStartMs = new Date(
+                              `${todayISO}T00:00:00`,
+                            ).getTime();
+                            const nowMs = Date.now();
 
-                              const basePrice2 = slots[idx + 1]
-                                ? Number(slot.slotPrice || 0) +
-                                  Number(slots[idx + 1].slotPrice || 0)
-                                : 0;
+                            const weekDays = rawWeekDays.map((day) => {
+                              const dayStartMs = new Date(
+                                `${day.date}T00:00:00`,
+                              ).getTime();
 
-                              const currency = slot.currency || "SEK";
+                              // 1) Om dagen är i det förflutna: visa dagen men inga tider
+                              if (dayStartMs < todayStartMs) {
+                                return { ...day, slots: [], isPastDay: true };
+                              }
 
-                              // ✅ per_person: visa pris baserat på valt sällskap
-                              const people = Number(b.partySize || 1);
-                              const multiplier =
-                                activity.bookingUnit === "per_person"
-                                  ? people
-                                  : 1;
+                              // 2) Om dagen är idag: filtrera bort tider som startar nu eller tidigare
+                              if (day.date === todayISO) {
+                                return {
+                                  ...day,
+                                  isPastDay: false,
+                                  slots: (day.slots || []).filter((slot) => {
+                                    const startMs = new Date(
+                                      slot.startISO,
+                                    ).getTime();
+                                    return startMs > nowMs;
+                                  }),
+                                };
+                              }
 
-                              const price1 = Math.round(
-                                basePrice1 * multiplier,
-                              );
-                              const price2 = Math.round(
-                                basePrice2 * multiplier,
-                              );
+                              // 3) Framtida dagar: behåll allt
+                              return { ...day, isPastDay: false };
+                            });
 
-                              const covered = getCoveredStartISOs(activity.id);
-                              const isSelected = covered.has(slot.startISO);
+                            const covered = getCoveredStartISOs(b.activityId);
 
-                              const isStart2h = isTwoHourStart(
-                                activity.id,
-                                slot.startISO,
-                              );
-                              const isTail2h = isTwoHourTail(
-                                activity.id,
-                                slot.startISO,
-                              );
-
-                              const left = Math.max(
-                                0,
-                                (slot.availableTracks || 0) - usedInCart,
-                              );
-
-                              const can1 =
-                                needMore1 && canPickStart(activity.id, idx, 1);
-                              const can2 =
-                                needMore2 && canPickStart(activity.id, idx, 2);
-
-                              const timeLabel = new Date(
-                                slot.startISO,
-                              ).toLocaleTimeString("sv-SE", {
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              });
-
-                              const chipClass =
-                                left === 0
-                                  ? "chip chip-red"
-                                  : left === 1
-                                    ? "chip chip-yellow"
-                                    : "chip chip-green";
-
-                              return (
-                                <div
-                                  key={slot.startISO}
-                                  className={`slot-card 
-    ${left === 0 ? "slot-card-disabled" : ""} 
-    ${isSelected ? "slot-selected" : ""} 
-    ${isStart2h ? "slot-selected-start" : ""} 
-    ${isTail2h ? "slot-selected-tail" : ""}
-  `}
-                                >
-                                  <div className="slot-top">
-                                    <div className="slot-time">{timeLabel}</div>
-                                    <div className={chipClass}>
-                                      {left === 0 ? "Fullt" : `${left} kvar`}
+                            return (
+                              <div className="week-calendar">
+                                {weekDays.map((day) => (
+                                  <div key={day.date} className="week-day">
+                                    <div className="week-day-header">
+                                      {day.label}
                                     </div>
-                                  </div>
 
-                                  <div className="slot-buttons">
-                                    <button
-                                      className="btn"
-                                      disabled={!can1}
-                                      onClick={() =>
-                                        pickTime(activity.id, slot.startISO, 1)
-                                      }
-                                    >
-                                      1h
-                                    </button>
-                                    <button
-                                      className="btn btn-secondary"
-                                      disabled={!can2}
-                                      onClick={() =>
-                                        pickTime(activity.id, slot.startISO, 2)
-                                      }
-                                    >
-                                      2h
-                                    </button>
-                                  </div>
+                                    {day.slots.length === 0 ? (
+                                      <div className="week-day-empty">—</div>
+                                    ) : (
+                                      day.slots.map((slot) => {
+                                        const slotMinutes =
+                                          av?.slotMinutes || 60;
+                                        const usedInCart =
+                                          takenCountInCartForSlot(
+                                            b.activityId,
+                                            slot.startISO,
+                                            slotMinutes,
+                                          );
 
-                                  <div className="slot-foot muted">
-                                    <strong>
-                                      {price1} {currency} /{" "}
-                                      {av?.slotMinutes || 60} min
-                                    </strong>
-                                    {activity.bookingUnit === "per_person" && (
-                                      <div
-                                        className="muted"
-                                        style={{ marginTop: 4 }}
-                                      >
-                                        ({Number(b.partySize || 1)} personer)
-                                      </div>
+                                        const effectiveAvailable = Math.max(
+                                          0,
+                                          (slot.availableTracks || 0) -
+                                            usedInCart,
+                                        );
+
+                                        const isFull = effectiveAvailable <= 0;
+                                        const isLow =
+                                          !isFull && effectiveAvailable <= 1;
+
+                                        const durationSlots = needMore1
+                                          ? 1
+                                          : needMore2
+                                            ? 2
+                                            : 1;
+
+                                        const idx = slots.findIndex(
+                                          (s) => s.startISO === slot.startISO,
+                                        );
+                                        const canStartHere =
+                                          durationSlots === 1
+                                            ? !isFull
+                                            : canPickStart(
+                                                b.activityId,
+                                                idx,
+                                                2,
+                                              );
+
+                                        const isSelected = covered.has(
+                                          slot.startISO,
+                                        );
+
+                                        return (
+                                          <button
+                                            key={slot.startISO}
+                                            type="button"
+                                            className={[
+                                              "time-pill",
+                                              isSelected ? "selected" : "",
+                                              isFull
+                                                ? "is-full"
+                                                : isLow
+                                                  ? "is-low"
+                                                  : "is-ok",
+                                            ].join(" ")}
+                                            disabled={!canStartHere}
+                                            onClick={() =>
+                                              pickTime(
+                                                b.activityId,
+                                                slot.startISO,
+                                                durationSlots,
+                                              )
+                                            }
+                                            title={
+                                              isFull
+                                                ? "Fullt"
+                                                : durationSlots === 2 &&
+                                                    !canStartHere
+                                                  ? "Kan inte boka 2h här"
+                                                  : "Boka"
+                                            }
+                                          >
+                                            <span className="time-pill-time">
+                                              {timeLabelSV(slot.startISO)}
+                                            </span>
+                                            <span className="time-pill-price">
+                                              {Number(
+                                                slot.slotPrice || 0,
+                                              ).toFixed(0)}{" "}
+                                              kr
+                                            </span>
+                                          </button>
+                                        );
+                                      })
                                     )}
                                   </div>
-
-                                  <div className="slot-foot muted">
-                                    {activity.bookingUnit === "per_person"
-                                      ? "Bokningen gäller 1 bana. Priset beror på antal personer."
-                                      : "Flera banor kräver flera tider i rad."}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                ))}
+                              </div>
+                            );
+                          })()
                         )}
                       </div>
                     );
@@ -1441,4 +1467,4 @@ const Home = () => {
   );
 };
 
-export default Home;
+export default Book;

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import "./Home.css";
 import Lenis from "lenis";
 import Navbar from "../../components/navbar/Navbar";
+import Footer from "../../components/footer/Footer";
 
 import Logo from "../../assets/web/Logo.png";
 
@@ -9,6 +10,7 @@ const Home = () => {
   localStorage.clear();
   const mainRef = useRef(null);
   const lenisRef = useRef(null);
+  const [scrollPos, setScrollPos] = useState(0);
 
   // Smooth scroll setup with Lenis
   useEffect(() => {
@@ -48,20 +50,13 @@ const Home = () => {
     <div className="main" ref={mainRef}>
       <Navbar />
       <div className="display">
-        <section>
-          <img className="top-logo" src={Logo} alt="" />
-          <h4>VÄLKOMMEN</h4>
-          <h5 className="top-h5">
-            Bowla med vänner och familj i vår toppmoderna bowlinghall. Oavsett
-            om du är en erfaren spelare eller nybörjare, erbjuder vi en rolig
-            och avslappnad atmosfär för alla. Boka din bana idag och upplev
-            spänningen i varje kast!
-          </h5>
-        </section>
-        <section>
-          <h4>VÅRA AKTIVITETER</h4>
+        <section className="top-section">
+          <a className="top-button" href="/book">
+            Boka frisörtid
+          </a>
         </section>
       </div>
+      <Footer />
     </div>
   );
 };
