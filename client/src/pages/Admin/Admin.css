@@ -6,6 +6,19 @@
   margin-left: 280px;
   display: flex;
   flex-direction: column;
+
+  /* Colors admin */
+  --primary: #2eeabb;
+  --primary-shadow: #2eeabb53;
+  --secondary: #27cca4;
+  --background: rgb(251, 255, 255);
+  --background-secondary: rgb(255, 255, 255);
+  --text: #12151c;
+  --shadow: #00000029;
+  --dot-brightness: 1;
+  --bg-scroll: 0px;
+  --border-radius: 10px;
+  --border-radius-2: 6px;
 }
 
 /* Allt admin-content ska aligna i samma inner container */

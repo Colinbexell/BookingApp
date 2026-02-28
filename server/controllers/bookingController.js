@@ -2,6 +2,8 @@ const Booking = require("../models/bookingModel");
 const Activity = require("../models/activityModel");
 const mongoose = require("mongoose");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const crypto = require("crypto");
+const { sendBookingConfirmationRequest, sendBookingConfirmed } = require("../services/emailService");
 
 // --- basic YYYY-MM-DD validator ---
 const isValidDateISO = (s) =>
@@ -98,7 +100,7 @@ const createBooking = async (req, res) => {
         .json({ message: "paymentMethod must be onsite|online" });
 
     const act = await Activity.findById(activityId).select(
-      "workshopId bookingRules pricingRules tracks bookingUnit partyRules takesPayment",
+      "workshopId bookingRules pricingRules tracks bookingUnit partyRules takesPayment title",
     );
 
     if (!act) return res.status(400).json({ message: "Invalid activityId" });
@@ -154,7 +156,7 @@ const createBooking = async (req, res) => {
 
     const overlapping = await Booking.find({
       activityId: act._id,
-      status: "active",
+      status: { $in: ["active", "pending", "confirmed"] },
       startAt: { $lt: endAt },
       endAt: { $gt: startAt },
     }).select("partySize");
@@ -211,6 +213,9 @@ const createBooking = async (req, res) => {
     // TODO: här kan du stoppa in din “capacity check” (tracks) om du vill låsa på serversidan
     // Just nu: vi skapar bokningen rakt av.
 
+    const confirmationToken = crypto.randomBytes(32).toString("hex");
+    const confirmationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+
     const doc = await Booking.create({
       workshopId: act.workshopId,
       activityId: act._id,
@@ -231,10 +236,22 @@ const createBooking = async (req, res) => {
       // Online ska INTE bli paid här. Det sker via Stripe-webhook.
       paymentStatus: isPaid ? "unpaid" : "paid",
 
+      status: "pending",
+      confirmationToken,
+      confirmationTokenExpiresAt,
+
       currency: act.pricingRules?.currency || "SEK",
       unitPrices: isPaid ? unitPrices : [],
       totalPrice,
     });
+
+    // Skicka bekräftelsemail (utan att blockera svaret)
+    const confirmUrl = `${process.env.APP_URL}/booking/confirm/${confirmationToken}`;
+    sendBookingConfirmationRequest({
+      booking: doc,
+      activityTitle: act.title || "Aktivitet",
+      confirmUrl,
+    }).catch((err) => console.error("Kunde inte skicka bekräftelsemail:", err.message));
 
     return res.status(201).json({ ok: true, booking: doc });
   } catch (err) {
@@ -249,7 +266,7 @@ const createBooking = async (req, res) => {
 const listBookingsForWorkshop = async (req, res) => {
   try {
     const { workshopId } = req.params;
-    const { from, to, status = "active" } = req.query;
+    const { from, to, status = "active,confirmed" } = req.query;
 
     if (!workshopId)
       return res.status(400).json({ message: "workshopId is required" });
@@ -262,11 +279,17 @@ const listBookingsForWorkshop = async (req, res) => {
 
     const wsId = new mongoose.Types.ObjectId(workshopId);
 
+    // status kan vara "all" eller kommaseparerade värden t.ex. "active,confirmed,pending"
+    const statusFilter =
+      status === "all"
+        ? {}
+        : { status: { $in: status.split(",").map((s) => s.trim()) } };
+
     const rows = await Booking.aggregate([
       {
         $match: {
           workshopId: wsId,
-          ...(status === "all" ? {} : { status }),
+          ...statusFilter,
           startAt: { $lte: toEnd },
           endAt: { $gte: fromStart },
         },
@@ -490,13 +513,69 @@ const markBookingsPaid = async (req, res) => {
 
     const ids = bookingIds.map((id) => new mongoose.Types.ObjectId(id));
 
-    // Markera bara aktiva bokningar som betalda
+    // Markera bara aktiva/bekräftade bokningar som betalda
     const result = await Booking.updateMany(
-      { _id: { $in: ids }, status: "active" },
+      { _id: { $in: ids }, status: { $in: ["active", "confirmed", "pending"] } },
       { $set: { paymentStatus: "paid" } },
     );
 
     return res.json({ ok: true, modified: result.modifiedCount });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+};
+
+/**
+ * GET /booking/confirm/:token
+ * Kunden klickar på länken i mailet → bokningen bekräftas
+ */
+const confirmBooking = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const booking = await Booking.findOne({
+      confirmationToken: token,
+      status: "pending",
+    });
+
+    if (!booking) {
+      return res.status(404).send(`
+        <div style="font-family:sans-serif;text-align:center;padding:60px 20px;">
+          <h2>Länken är ogiltig eller redan använd</h2>
+          <p>Bokningen kan redan vara bekräftad eller länken har gått ut.</p>
+        </div>
+      `);
+    }
+
+    if (new Date() > booking.confirmationTokenExpiresAt) {
+      return res.status(410).send(`
+        <div style="font-family:sans-serif;text-align:center;padding:60px 20px;">
+          <h2>Länken har gått ut</h2>
+          <p>Bekräftelselänken var giltig i 24 timmar. Kontakta oss om du behöver hjälp.</p>
+        </div>
+      `);
+    }
+
+    booking.status = "confirmed";
+    booking.confirmationToken = undefined;
+    booking.confirmationTokenExpiresAt = undefined;
+    await booking.save();
+
+    // Hämta aktivitetstitel för mailet
+    const act = await Activity.findById(booking.activityId).select("title");
+
+    // Skicka "din bokning är bekräftad"-mail
+    sendBookingConfirmed({
+      booking,
+      activityTitle: act?.title || "Aktivitet",
+    }).catch((err) => console.error("Kunde inte skicka bekräftat-mail:", err.message));
+
+    return res.send(`
+      <div style="font-family:sans-serif;text-align:center;padding:60px 20px;max-width:480px;margin:0 auto;">
+        <h2 style="color:#1a1a1a;">✓ Bokning bekräftad!</h2>
+        <p style="color:#555;">Tack ${booking.customerName}! Din bokning är nu bekräftad. Du får även ett bekräftelsemail.</p>
+      </div>
+    `);
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });
   }
@@ -507,4 +586,5 @@ module.exports = {
   listBookingsForWorkshop,
   cancelBookings,
   markBookingsPaid,
+  confirmBooking,
 };

@@ -6,15 +6,11 @@ const app = express();
 const path = require("path");
 const cors = require("cors");
 
-// DB connection
-mongoose
-  .connect(process.env.DB_URL)
-  .then(() => {
-    console.log("Database connected");
-  })
-  .catch((err) => {
-    console.error("Database connection error:", err);
-  });
+// Använder GOOGLE DNS. Ta bort vid produktion
+const dns = require("dns");
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
+
 
 // Middleware
 app.use(
@@ -45,7 +41,23 @@ app.use("/upload", require("./routes/uploadRoutes"));
 app.use("/stats", require("./routes/statsRoutes"));
 app.use("/payment", require("./routes/paymentRoutes"));
 
-// Start the server
-app.listen(6969, () => {
-  console.log("Server is running on port 6969");
+const connectDB = async (retries = 5) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await mongoose.connect(process.env.DB_URL);
+      console.log("Database connected");
+      return;
+    } catch (err) {
+      console.error(`DB-försök ${i + 1} misslyckades:`, err.message);
+      if (i < retries - 1) await new Promise(r => setTimeout(r, 3000));
+    }
+  }
+  console.error("Kunde inte ansluta till databasen, stänger av.");
+  process.exit(1);
+};
+
+connectDB().then(() => {
+  app.listen(6969, () => {
+    console.log("Server is running on port 6969");
+  });
 });

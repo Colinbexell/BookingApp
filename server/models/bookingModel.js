@@ -39,10 +39,14 @@ const bookingSchema = new Schema(
     // Status för bokning
     status: {
       type: String,
-      enum: ["active", "cancelled"],
-      default: "active",
+      enum: ["pending", "active", "confirmed", "cancelled"],
+      default: "pending",
       index: true,
     },
+
+    // Token för e-postbekräftelse
+    confirmationToken: { type: String, index: true },
+    confirmationTokenExpiresAt: { type: Date },
 
     // Betalning
     paymentStatus: {
