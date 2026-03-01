@@ -47,7 +47,7 @@ const resolveAvailability = async (activityDoc) => {
     return activityDoc.availability || { weekly: [], exceptions: [] };
 
   const ws = await Workshop.findById(activityDoc.workshopId).select(
-    "availability"
+    "availability",
   );
   return ws?.availability || { weekly: [], exceptions: [] };
 };
@@ -234,7 +234,7 @@ const updateActivity = async (req, res) => {
 
     if (patch.pricingRules?.defaultPricePerHour !== undefined)
       patch.pricingRules.defaultPricePerHour = Number(
-        patch.pricingRules.defaultPricePerHour
+        patch.pricingRules.defaultPricePerHour,
       );
 
     const updated = await Activity.findByIdAndUpdate(id, patch, {
@@ -351,7 +351,7 @@ const getActivityAvailability = async (req, res) => {
 
     const bookings = await Booking.find({
       activityId: act._id,
-      status: "active",
+      status: { $in: ["active", "pending", "confirmed"] },
       startAt: { $lt: toStart },
       endAt: { $gt: fromStart },
     }).select("startAt endAt partySize");

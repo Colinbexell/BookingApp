@@ -3,7 +3,10 @@ const Activity = require("../models/activityModel");
 const mongoose = require("mongoose");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const crypto = require("crypto");
-const { sendBookingConfirmationRequest, sendBookingConfirmed } = require("../services/emailService");
+const {
+  sendBookingConfirmationRequest,
+  sendBookingConfirmed,
+} = require("../services/emailService");
 
 // --- basic YYYY-MM-DD validator ---
 const isValidDateISO = (s) =>
@@ -108,7 +111,7 @@ const createBooking = async (req, res) => {
     const ws = await mongoose
       .model("Workshop")
       .findById(act.workshopId)
-      .select("paymentOptions");
+      .select("paymentOptions name");
 
     const payOpts = ws?.paymentOptions || {
       allowOnsite: true,
@@ -214,7 +217,9 @@ const createBooking = async (req, res) => {
     // Just nu: vi skapar bokningen rakt av.
 
     const confirmationToken = crypto.randomBytes(32).toString("hex");
-    const confirmationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24h
+    const confirmationTokenExpiresAt = new Date(
+      Date.now() + 24 * 60 * 60 * 1000,
+    ); // 24h
 
     const doc = await Booking.create({
       workshopId: act.workshopId,
@@ -246,12 +251,16 @@ const createBooking = async (req, res) => {
     });
 
     // Skicka bekräftelsemail (utan att blockera svaret)
-    const confirmUrl = `${process.env.APP_URL}/booking/confirm/${confirmationToken}`;
+    const confirmUrl = `${process.env.CLIENT_URL}/booking/confirm/${confirmationToken}`;
+    console.log("🔗 Confirm URL i mailet:", confirmUrl);
     sendBookingConfirmationRequest({
       booking: doc,
       activityTitle: act.title || "Aktivitet",
       confirmUrl,
-    }).catch((err) => console.error("Kunde inte skicka bekräftelsemail:", err.message));
+      companyName: ws?.name || "Bexo",
+    }).catch((err) =>
+      console.error("Kunde inte skicka bekräftelsemail:", err.message),
+    );
 
     return res.status(201).json({ ok: true, booking: doc });
   } catch (err) {
@@ -515,7 +524,10 @@ const markBookingsPaid = async (req, res) => {
 
     // Markera bara aktiva/bekräftade bokningar som betalda
     const result = await Booking.updateMany(
-      { _id: { $in: ids }, status: { $in: ["active", "confirmed", "pending"] } },
+      {
+        _id: { $in: ids },
+        status: { $in: ["active", "confirmed", "pending"] },
+      },
       { $set: { paymentStatus: "paid" } },
     );
 
@@ -528,10 +540,12 @@ const markBookingsPaid = async (req, res) => {
 /**
  * GET /booking/confirm/:token
  * Kunden klickar på länken i mailet → bokningen bekräftas
+ * Stöder ?json=1 för React-frontend
  */
 const confirmBooking = async (req, res) => {
   try {
     const { token } = req.params;
+    const wantsJson = req.query.json === "1";
 
     const booking = await Booking.findOne({
       confirmationToken: token,
@@ -539,6 +553,34 @@ const confirmBooking = async (req, res) => {
     });
 
     if (!booking) {
+      // Kolla om den redan är bekräftad
+      const existing = await Booking.findOne({
+        confirmationToken: undefined,
+      }).select("_id"); // dummy – vi kontrollerar via token-sök nedan
+
+      // Sök utan status-filter för att ge rätt felmeddelande
+      const any = await Booking.findOne({
+        confirmationToken: token,
+      });
+
+      if (any) {
+        // Token finns men status är inte pending = redan bekräftad
+        if (wantsJson) {
+          return res
+            .status(409)
+            .json({ ok: false, status: "already_confirmed" });
+        }
+        return res.status(409).send(`
+          <div style="font-family:sans-serif;text-align:center;padding:60px 20px;">
+            <h2>Redan bekräftad</h2>
+            <p>Bokningen är redan bekräftad.</p>
+          </div>
+        `);
+      }
+
+      if (wantsJson) {
+        return res.status(404).json({ ok: false, status: "not_found" });
+      }
       return res.status(404).send(`
         <div style="font-family:sans-serif;text-align:center;padding:60px 20px;">
           <h2>Länken är ogiltig eller redan använd</h2>
@@ -548,6 +590,9 @@ const confirmBooking = async (req, res) => {
     }
 
     if (new Date() > booking.confirmationTokenExpiresAt) {
+      if (wantsJson) {
+        return res.status(410).json({ ok: false, status: "expired" });
+      }
       return res.status(410).send(`
         <div style="font-family:sans-serif;text-align:center;padding:60px 20px;">
           <h2>Länken har gått ut</h2>
@@ -557,18 +602,39 @@ const confirmBooking = async (req, res) => {
     }
 
     booking.status = "confirmed";
-    booking.confirmationToken = undefined;
-    booking.confirmationTokenExpiresAt = undefined;
     await booking.save();
 
-    // Hämta aktivitetstitel för mailet
-    const act = await Activity.findById(booking.activityId).select("title");
+    const act = await Activity.findById(booking.activityId).select(
+      "title workshopId",
+    );
+    const ws = await mongoose
+      .model("Workshop")
+      .findById(act?.workshopId)
+      .select("name");
 
-    // Skicka "din bokning är bekräftad"-mail
     sendBookingConfirmed({
       booking,
       activityTitle: act?.title || "Aktivitet",
-    }).catch((err) => console.error("Kunde inte skicka bekräftat-mail:", err.message));
+      companyName: ws?.name || "Bexo",
+    }).catch((err) =>
+      console.error("Kunde inte skicka bekräftat-mail:", err.message),
+    );
+
+    if (wantsJson) {
+      return res.json({
+        ok: true,
+        status: "success",
+        booking: {
+          customerName: booking.customerName,
+          activityTitle: act?.title || "Aktivitet",
+          startAt: booking.startAt,
+          endAt: booking.endAt,
+          totalPrice: booking.totalPrice,
+          currency: booking.currency,
+          paymentMethod: booking.paymentMethod,
+        },
+      });
+    }
 
     return res.send(`
       <div style="font-family:sans-serif;text-align:center;padding:60px 20px;max-width:480px;margin:0 auto;">

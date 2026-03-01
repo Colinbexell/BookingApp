@@ -1,12 +1,12 @@
 const nodemailer = require("nodemailer");
 
 const transporter = nodemailer.createTransport({
-  host: "smtp.gmail.com",
-  port: 587,
-  secure: false,
+  host: "smtp.strato.com", // Stratos SMTP-server
+  port: 465,
+  secure: true,
   auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS, // App Password från Google, inte ditt vanliga lösenord
+    user: "webmaster@bexos.se", // hela mailadressen
+    pass: process.env.MAIL_PASS, // lösenordet du loggar in med på Strato
   },
 });
 
@@ -25,7 +25,12 @@ const formatTime = (date) => {
 /**
  * Skickar bokningsbekräftelse med en bekräftelselänk till kunden
  */
-const sendBookingConfirmationRequest = async ({ booking, activityTitle, confirmUrl }) => {
+const sendBookingConfirmationRequest = async ({
+  booking,
+  activityTitle,
+  confirmUrl,
+  companyName = "Bexo",
+}) => {
   const dateStr = formatDate(booking.startAt);
   const startStr = formatTime(booking.startAt);
   const endStr = formatTime(booking.endAt);
@@ -56,7 +61,7 @@ const sendBookingConfirmationRequest = async ({ booking, activityTitle, confirmU
   `;
 
   await transporter.sendMail({
-    from: `"Bexo" <${process.env.MAIL_USER}>`,
+    from: `"${companyName}" <${process.env.MAIL_USER}>`,
     to: booking.email,
     subject: `Bekräfta din bokning – ${activityTitle} ${dateStr}`,
     html,
@@ -66,7 +71,11 @@ const sendBookingConfirmationRequest = async ({ booking, activityTitle, confirmU
 /**
  * Skickar ett bekräftat-mail efter att kunden klickat på länken
  */
-const sendBookingConfirmed = async ({ booking, activityTitle }) => {
+const sendBookingConfirmed = async ({
+  booking,
+  activityTitle,
+  companyName = "Bexo",
+}) => {
   const dateStr = formatDate(booking.startAt);
   const startStr = formatTime(booking.startAt);
   const endStr = formatTime(booking.endAt);
@@ -88,7 +97,7 @@ const sendBookingConfirmed = async ({ booking, activityTitle }) => {
   `;
 
   await transporter.sendMail({
-    from: `"Bexo" <${process.env.MAIL_USER}>`,
+    from: `"${companyName}" <${process.env.MAIL_USER}>`,
     to: booking.email,
     subject: `Bokningsbekräftelse – ${activityTitle} ${dateStr}`,
     html,

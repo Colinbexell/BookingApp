@@ -176,7 +176,9 @@ const Admin = () => {
   // Bokningsdetaljer + betalningsverifiering
   const [bookingPopupOpen, setBookingPopupOpen] = useState(false);
   const [bookingTarget, setBookingTarget] = useState(null);
-  const [bookingFilter, setBookingFilter] = useState("active");
+  const [bookingFilter, setBookingFilter] = useState(
+    "active,confirmed,pending",
+  );
 
   const [verifyPopupOpen, setVerifyPopupOpen] = useState(false);
   const [isMarkingPaid, setIsMarkingPaid] = useState(false);
