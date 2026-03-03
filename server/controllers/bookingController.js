@@ -81,6 +81,7 @@ const createBooking = async (req, res) => {
       phone,
       paymentMethod,
       partySize,
+      staffId,
     } = req.body;
 
     if (!activityId)
@@ -103,8 +104,8 @@ const createBooking = async (req, res) => {
         .json({ message: "paymentMethod must be onsite|online" });
 
     const act = await Activity.findById(activityId).select(
-      "workshopId bookingRules pricingRules tracks bookingUnit partyRules takesPayment title",
-    );
+  "workshopId bookingRules pricingRules tracks bookingUnit partyRules takesPayment title staffIds",
+);
 
     if (!act) return res.status(400).json({ message: "Invalid activityId" });
 
@@ -155,24 +156,41 @@ const createBooking = async (req, res) => {
       }
     }
 
-    const unitsNeeded = 1;
+    if (act.bookingUnit === "per_staff") {
+  if (!staffId)
+    return res.status(400).json({ message: "staffId krävs för denna aktivitet" });
 
-    const overlapping = await Booking.find({
-      activityId: act._id,
-      status: { $in: ["active", "pending", "confirmed"] },
-      startAt: { $lt: endAt },
-      endAt: { $gt: startAt },
-    }).select("partySize");
+  const isValidStaff = (act.staffIds || []).some(
+    (id) => id.toString() === staffId
+  );
+  if (!isValidStaff)
+    return res.status(400).json({ message: "Ogiltig utförare för denna aktivitet" });
 
-    const unitsTaken = overlapping.length;
+  const conflict = await Booking.findOne({
+    activityId: act._id,
+    staffId,
+    status: { $in: ["active", "pending", "confirmed"] },
+    startAt: { $lt: endAt },
+    endAt: { $gt: startAt },
+  });
+  if (conflict)
+    return res.status(409).json({
+      message: "Den valda utföraren är inte tillgänglig den valda tiden",
+    });
+} else {
+  const overlapping = await Booking.find({
+    activityId: act._id,
+    status: { $in: ["active", "pending", "confirmed"] },
+    startAt: { $lt: endAt },
+    endAt: { $gt: startAt },
+  }).select("partySize");
 
-    const capacity = Number(act.tracks || 0);
-
-    if (unitsTaken + unitsNeeded > capacity) {
-      return res.status(409).json({
-        message: "Den tiden har inte tillräcklig kapacitet kvar",
-      });
-    }
+  if (overlapping.length + 1 > Number(act.tracks || 0)) {
+    return res.status(409).json({
+      message: "Den tiden har inte tillräcklig kapacitet kvar",
+    });
+  }
+}
 
     const currency = act.pricingRules?.currency || "SEK";
     const unitPrices = [];
@@ -235,6 +253,7 @@ const createBooking = async (req, res) => {
 
       bookingUnit: act.bookingUnit || "per_lane",
       partySize: ps,
+      ...(act.bookingUnit === "per_staff" && staffId ? { staffId } : {}),
 
       paymentMethod: isPaid ? paymentMethod : "onsite",
 
@@ -316,6 +335,15 @@ const listBookingsForWorkshop = async (req, res) => {
       { $unwind: { path: "$activity", preserveNullAndEmptyArrays: true } },
 
       {
+  $lookup: {
+    from: "staffs",
+    localField: "staffId",
+    foreignField: "_id",
+    as: "staffDoc",
+  },
+},
+{ $unwind: { path: "$staffDoc", preserveNullAndEmptyArrays: true } },
+      {
         $addFields: {
           customerNameNorm: { $trim: { input: "$customerName" } },
           emailNorm: { $toLower: { $trim: { input: "$email" } } },
@@ -350,9 +378,12 @@ const listBookingsForWorkshop = async (req, res) => {
             paymentStatus: "$paymentStatus",
             paymentMethod: "$paymentMethod",
             status: "$status",
+            staffId: "$staffId",
+            bookingUnit: "$bookingUnit",
           },
 
           quantity: { $sum: 1 },
+          staffNameFirst: { $first: "$staffDoc.name" },
           createdAtMin: { $min: "$createdAt" },
 
           totalPriceSum: { $sum: "$totalPrice" },
@@ -392,6 +423,9 @@ const listBookingsForWorkshop = async (req, res) => {
           quantity: 1,
 
           bookingIds: 1,
+          staffId: "$_id.staffId",
+          staffName: "$staffNameFirst",
+          bookingUnit: "$_id.bookingUnit",
         },
       },
 

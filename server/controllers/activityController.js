@@ -153,23 +153,23 @@ const createActivity = async (req, res) => {
       takesPayment,
       bookingUnit,
       partyRules,
+      staffIds,
     } = req.body;
 
     if (!title) return res.status(400).json({ message: "title is required" });
-    if (!information)
-      return res.status(400).json({ message: "information is required" });
-    if (!imageUrl)
-      return res.status(400).json({ message: "imageUrl is required" });
-    if (!tracks) return res.status(400).json({ message: "tracks is required" });
-    if (!workshopId)
-      return res.status(400).json({ message: "workshopId is required" });
+if (!information) return res.status(400).json({ message: "information is required" });
+if (!imageUrl) return res.status(400).json({ message: "imageUrl is required" });
+if (!workshopId) return res.status(400).json({ message: "workshopId is required" });
 
-    const unit = bookingUnit || "per_lane";
-    if (!["per_lane", "per_person"].includes(unit)) {
-      return res.status(400).json({
-        message: "bookingUnit must be per_lane|per_person",
-      });
-    }
+const unit = bookingUnit || "per_lane";
+if (!["per_lane", "per_person", "per_staff"].includes(unit)) {
+  return res.status(400).json({
+    message: "bookingUnit must be per_lane|per_person|per_staff",
+  });
+}
+
+if (unit !== "per_staff" && !tracks)
+  return res.status(400).json({ message: "tracks is required" });
 
     const prMin = Number(partyRules?.min ?? 1);
     const prMax = Number(partyRules?.max ?? 99);
@@ -191,7 +191,8 @@ const createActivity = async (req, res) => {
       title,
       information,
       imageUrl,
-      tracks: Number(tracks),
+      tracks: unit === "per_staff" ? 0 : Number(tracks),
+staffIds: unit === "per_staff" ? (staffIds || []) : [],
       takesPayment: takesPayment !== false && takesPayment !== "false",
       bookingUnit: unit,
       partyRules: { min: prMin, max: prMax },
@@ -294,6 +295,7 @@ const listActivities = async (req, res) => {
       partyRules: a.partyRules,
 
       bookingRules: a.bookingRules,
+      staffIds: a.staffIds || [],
       pricingRules: a.pricingRules,
       useWorkshopAvailability: a.useWorkshopAvailability,
       workshopId: a.workshopId,
@@ -349,12 +351,25 @@ const getActivityAvailability = async (req, res) => {
     const fromStart = makeLocalDate(from, "00:00");
     const toStart = makeLocalDate(to, "00:00");
 
-    const bookings = await Booking.find({
-      activityId: act._id,
-      status: { $in: ["active", "pending", "confirmed"] },
-      startAt: { $lt: toStart },
-      endAt: { $gt: fromStart },
-    }).select("startAt endAt partySize");
+    const bookingFilter = {
+  activityId: act._id,
+  status: { $in: ["active", "pending", "confirmed"] },
+  startAt: { $lt: toStart },
+  endAt: { $gt: fromStart },
+};
+
+if (act.bookingUnit === "per_staff") {
+  const { staffId } = req.query;
+  if (!staffId) {
+    return res.status(400).json({
+      ok: false,
+      message: "staffId krävs för personalbaserade aktiviteter",
+    });
+  }
+  bookingFilter.staffId = staffId;
+}
+
+const bookings = await Booking.find(bookingFilter).select("startAt endAt partySize");
 
     const now = new Date();
     const leadMinutes = 0; // ändra till t.ex. 10 om du vill ha framförhållning
@@ -384,7 +399,8 @@ const getActivityAvailability = async (req, res) => {
           return acc + inc;
         }, 0);
 
-        const availableTracks = Math.max(0, act.tracks - taken);
+        const capacity = act.bookingUnit === "per_staff" ? 1 : Number(act.tracks || 0);
+const availableTracks = Math.max(0, capacity - taken);
 
         const startLocal = new Date(s.startISO);
         const startHHMM = startLocal.toLocaleTimeString("sv-SE", {

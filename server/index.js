@@ -36,6 +36,7 @@ app.use("/user", require("./routes/authRoutes"));
 app.use("/company", require("./routes/companyRoutes"));
 app.use("/workshop", require("./routes/workshopRoutes"));
 app.use("/activity", require("./routes/activityRoutes"));
+app.use("/staff", require("./routes/staffRoutes"));
 app.use("/booking", require("./routes/bookingRoutes"));
 app.use("/upload", require("./routes/uploadRoutes"));
 app.use("/stats", require("./routes/statsRoutes"));

@@ -72,7 +72,7 @@ const activitySchema = new Schema(
 
     bookingUnit: {
       type: String,
-      enum: ["per_lane", "per_person"],
+      enum: ["per_lane", "per_person", "per_staff"],
       default: "per_lane",
       index: true,
     },
@@ -82,6 +82,8 @@ const activitySchema = new Schema(
       min: { type: Number, default: 1 },
       max: { type: Number, default: 99 },
     },
+
+    staffIds: [{ type: Schema.Types.ObjectId, ref: "Staff" }],
     pricingRules: {
       currency: { type: String, default: "SEK" },
       defaultPricePerHour: { type: Number, default: 279 },

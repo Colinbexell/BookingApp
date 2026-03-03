@@ -28,13 +28,27 @@ const bookingSchema = new Schema(
     // Statistik & kapacitet
     bookingUnit: {
       type: String,
-      enum: ["per_lane", "per_person"],
+     enum: ["per_lane", "per_person", "per_staff"],
       default: "per_lane",
       index: true,
     },
 
     // antal personer i sällskapet (alltid sparat för statistik)
     partySize: { type: Number, default: 1 },
+
+    staffId: {
+  type: Schema.Types.ObjectId,
+  ref: "Staff",
+  index: true,
+  default: null,
+},
+
+    staffId: {
+  type: Schema.Types.ObjectId,
+  ref: "Staff",
+  index: true,
+  default: null,
+},
 
     // Status för bokning
     status: {
