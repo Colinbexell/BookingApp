@@ -22,14 +22,22 @@ const addDaysISO = (isoDate, days) => {
 };
 
 const startOfLocalDay = (iso) => makeLocalDate(iso, "00:00");
-const endOfLocalDay = (iso) => makeLocalDate(iso, "23:59");
+const endOfLocalDay   = (iso) => makeLocalDate(iso, "23:59");
 
 const toISODateLocal = (d) => {
   const pad2 = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 };
 
-// --- archiver: flytta äldre än 21 dagar (baserat på endAt) ---
+// ─── Status-helpers ───────────────────────────────────────────────────────────
+// "active" finns i enum men sätts aldrig i koden – behandla det som confirmed
+// för att inte tappa eventuell legacy-data.
+const CONFIRMED_STATUSES = ["confirmed", "active"];
+const isConfirmed  = (b) => CONFIRMED_STATUSES.includes(b.status);
+const isPending    = (b) => b.status === "pending";
+const isCancelled  = (b) => b.status === "cancelled";
+
+// ─── Archiver ─────────────────────────────────────────────────────────────────
 const archiveOlderThanDays = async ({ workshopId, days = 21 }) => {
   const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
 
@@ -67,18 +75,15 @@ const archiveOlderThanDays = async ({ workshopId, days = 21 }) => {
   }
 };
 
-// --- helper: groupKey för period ---
+// ─── Bucket-helper för tidsserier ─────────────────────────────────────────────
 const makeBucketKey = (date, groupBy) => {
   const d = new Date(date);
-  if (groupBy === "day") {
-    return toISODateLocal(d);
-  }
+  if (groupBy === "day") return toISODateLocal(d);
   if (groupBy === "week") {
-    // ISO-ish: måndag som start
     const copy = new Date(d.getTime());
-    const day = (copy.getDay() + 6) % 7; // 0=mån..6=sön
+    const day  = (copy.getDay() + 6) % 7; // 0 = mån
     copy.setDate(copy.getDate() - day);
-    return `${toISODateLocal(copy)}`;
+    return toISODateLocal(copy);
   }
   if (groupBy === "month") {
     const y = d.getFullYear();
@@ -89,7 +94,8 @@ const makeBucketKey = (date, groupBy) => {
   return toISODateLocal(d);
 };
 
-// --- GET /stats/workshop/:workshopId?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day|week|month|year
+// ─── Main handler ─────────────────────────────────────────────────────────────
+// GET /stats/workshop/:workshopId?from=YYYY-MM-DD&to=YYYY-MM-DD&groupBy=day|week|month|year
 const getWorkshopStats = async (req, res) => {
   try {
     const { workshopId } = req.params;
@@ -97,34 +103,30 @@ const getWorkshopStats = async (req, res) => {
 
     if (!workshopId)
       return res.status(400).json({ message: "workshopId is required" });
-    if (!isValidDateISO(from) || !isValidDateISO(to)) {
+    if (!isValidDateISO(from) || !isValidDateISO(to))
       return res.status(400).json({ message: "from/to must be YYYY-MM-DD" });
-    }
-    if (!["day", "week", "month", "year"].includes(groupBy)) {
-      return res
-        .status(400)
-        .json({ message: "groupBy must be day|week|month|year" });
-    }
+    if (!["day", "week", "month", "year"].includes(groupBy))
+      return res.status(400).json({ message: "groupBy must be day|week|month|year" });
 
-    // 1) arkivera innan vi räknar
+    // 1) Arkivera gamla bokningar innan vi räknar
     const archiveResult = await archiveOlderThanDays({ workshopId, days: 21 });
 
-    const wsId = new mongoose.Types.ObjectId(workshopId);
+    const wsId      = new mongoose.Types.ObjectId(workshopId);
     const fromStart = startOfLocalDay(from);
-    const toEnd = endOfLocalDay(to);
+    const toEnd     = endOfLocalDay(to);
 
-    // 2) hämta aktiviteter för “tracks” och titlar
+    // 2) Hämta aktiviteter (för titlar, banor, etc.)
     const activities = await Activity.find({ workshopId: wsId })
-      .select("_id title tracks bookingRules takesPayment")
+      .select("_id title tracks bookingRules takesPayment bookingUnit")
       .lean();
 
     const actMap = new Map(activities.map((a) => [String(a._id), a]));
 
-    // 3) hämta både live + archive för vald period
+    // 3) Hämta live + arkiverade bokningar för perioden
     const baseMatch = {
       workshopId: wsId,
       startAt: { $lte: toEnd },
-      endAt: { $gte: fromStart },
+      endAt:   { $gte: fromStart },
     };
 
     const [live, archived] = await Promise.all([
@@ -134,26 +136,42 @@ const getWorkshopStats = async (req, res) => {
 
     const all = [...live, ...archived];
 
-    // 4) KPIs
-    const totalBookings = all.filter((b) => b.status === "active").length;
-    const totalCancellations = all.filter(
-      (b) => b.status === "cancelled",
-    ).length;
+    // ── Segmentera ──────────────────────────────────────────────────────────
+    const confirmedBookings = all.filter(isConfirmed);
+    const pendingBookings   = all.filter(isPending);
+    const cancelledBookings = all.filter(isCancelled);
 
+    // ─── 4) KPIs ────────────────────────────────────────────────────────────
+
+    // Bekräftade (verkliga) bokningar
+    const totalConfirmed     = confirmedBookings.length;
+    // Väntande: skapade men ej e-postbekräftade (token ej klickad ännu)
+    const totalPending       = pendingBookings.length;
+    // Avbokade
+    const totalCancellations = cancelledBookings.length;
+
+    // Avbokningsgrad = avbokade / (bekräftade + avbokade)
     const cancellationRate =
-      totalBookings + totalCancellations === 0
+      totalConfirmed + totalCancellations === 0
         ? 0
-        : (totalCancellations / (totalBookings + totalCancellations)) * 100;
+        : (totalCancellations / (totalConfirmed + totalCancellations)) * 100;
 
-    const preliminaryRevenue = all
-      .filter((b) => b.status === "active")
+    // Preliminär omsättning = mail-bekräftade bokningar (kunden svarat), oavsett betalning.
+    // Obesvarade mail (pending) räknas INTE.
+    const preliminaryRevenue = confirmedBookings
       .reduce((sum, b) => sum + Number(b.totalPrice || 0), 0);
 
+    // Faktisk omsättning = alla bokningar där betalningen är bekräftad (paymentStatus: "paid"),
+    // oavsett om mailet är besvarat eller ej — pending + confirmed räknas båda.
     const actualRevenue = all
-      .filter((b) => b.status === "active" && b.paymentStatus === "paid")
+      .filter((b) => !isCancelled(b) && b.paymentStatus === "paid")
       .reduce((sum, b) => sum + Number(b.totalPrice || 0), 0);
 
-    // snitt bokningar per dag inom intervallet (baserat på antal dagar)
+    // Potentiell omsättning = obesvarade mail (pending), försvinner om 24h-token går ut
+    const pendingRevenue = pendingBookings
+      .reduce((sum, b) => sum + Number(b.totalPrice || 0), 0);
+
+    // Antal dagar i intervallet
     const dayCount = Math.max(
       1,
       Math.round(
@@ -161,15 +179,15 @@ const getWorkshopStats = async (req, res) => {
           (24 * 60 * 60 * 1000),
       ) + 1,
     );
-    const avgBookingsPerDay = (totalBookings + totalCancellations) / dayCount;
 
-    // lead time: createdAt -> startAt (i timmar)
-    const leadTimes = all
+    // Snitt bekräftade bokningar per dag
+    const avgBookingsPerDay = totalConfirmed / dayCount;
+
+    // Lead time: snittet av (startAt - createdAt) i timmar, för bekräftade
+    const leadTimes = confirmedBookings
       .filter((b) => b.createdAt && b.startAt)
-      .map(
-        (b) =>
-          (new Date(b.startAt).getTime() - new Date(b.createdAt).getTime()) /
-          36e5,
+      .map((b) =>
+        (new Date(b.startAt).getTime() - new Date(b.createdAt).getTime()) / 36e5,
       )
       .filter((x) => Number.isFinite(x) && x >= 0);
 
@@ -177,31 +195,28 @@ const getWorkshopStats = async (req, res) => {
       ? leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length
       : 0;
 
-    // 5) payment method counts
-    const payOnsiteCount = all.filter(
-      (b) => b.paymentMethod === "onsite",
+    // Betalsätt-fördelning (bland bekräftade)
+    const payOnsiteCount = confirmedBookings.filter(
+      (b) => b.paymentMethod === "onsite"
     ).length;
-    const payOnlineCount = all.filter(
-      (b) => b.paymentMethod === "online",
+    const payOnlineCount = confirmedBookings.filter(
+      (b) => b.paymentMethod === "online"
     ).length;
 
-    // unpaid “needs attention”: aktiv + unpaid + har passerat
+    // Obetalda som passerat sin tid (bekräftade, ej betalda, endAt < nu)
     const now = new Date();
-    const unpaidAttention = all.filter(
-      (b) =>
-        b.status === "active" &&
-        b.paymentStatus === "unpaid" &&
-        new Date(b.endAt) < now,
+    const unpaidAttention = confirmedBookings.filter(
+      (b) => b.paymentStatus === "unpaid" && new Date(b.endAt) < now,
     ).length;
 
-    // 6) snitt sällskap per aktivitet
+    // ─── 5) Snitt sällskapsstorlek per aktivitet (bekräftade) ───────────────
     const partyByAct = new Map();
-    for (const b of all) {
+    for (const b of confirmedBookings) {
       const id = String(b.activityId || "");
       if (!id) continue;
       const prev = partyByAct.get(id) || { sum: 0, n: 0 };
       prev.sum += Number(b.partySize || 1);
-      prev.n += 1;
+      prev.n   += 1;
       partyByAct.set(id, prev);
     }
     const avgPartySizePerActivity = Array.from(partyByAct.entries()).map(
@@ -212,9 +227,9 @@ const getWorkshopStats = async (req, res) => {
       }),
     );
 
-    // 7) populäraste aktiviteter (bokningar)
+    // ─── 6) Populäraste aktiviteter per antal bekräftade bokningar ──────────
     const countByAct = new Map();
-    for (const b of all) {
+    for (const b of confirmedBookings) {
       const id = String(b.activityId || "");
       if (!id) continue;
       countByAct.set(id, (countByAct.get(id) || 0) + 1);
@@ -228,16 +243,15 @@ const getWorkshopStats = async (req, res) => {
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
 
-    // 8) avbokningsgrad per aktivitet
+    // ─── 7) Avbokningsgrad per aktivitet ────────────────────────────────────
     const cancByAct = new Map();
-    const totByAct = new Map();
+    const totByAct  = new Map();
     for (const b of all) {
+      if (isPending(b)) continue; // räkna inte in obekräftade
       const id = String(b.activityId || "");
       if (!id) continue;
       totByAct.set(id, (totByAct.get(id) || 0) + 1);
-      if (b.status === "cancelled") {
-        cancByAct.set(id, (cancByAct.get(id) || 0) + 1);
-      }
+      if (isCancelled(b)) cancByAct.set(id, (cancByAct.get(id) || 0) + 1);
     }
     const cancellationRatePerActivity = Array.from(totByAct.entries())
       .map(([activityId, total]) => {
@@ -251,23 +265,18 @@ const getWorkshopStats = async (req, res) => {
       .sort((a, b) => b.rate - a.rate)
       .slice(0, 8);
 
-    // 9) omsättning per aktivitet (prelim/faktisk)
+    // ─── 8) Omsättning per aktivitet (prelim / faktisk) ─────────────────────
+    // prelim = mail-bekräftade, faktisk = betalda oavsett mailstatus
     const revPreByAct = new Map();
     const revActByAct = new Map();
     for (const b of all) {
       const id = String(b.activityId || "");
-      if (!id) continue;
-      if (b.status === "active") {
-        revPreByAct.set(
-          id,
-          (revPreByAct.get(id) || 0) + Number(b.totalPrice || 0),
-        );
-        if (b.paymentStatus === "paid") {
-          revActByAct.set(
-            id,
-            (revActByAct.get(id) || 0) + Number(b.totalPrice || 0),
-          );
-        }
+      if (!id || isCancelled(b)) continue;
+      if (isConfirmed(b)) {
+        revPreByAct.set(id, (revPreByAct.get(id) || 0) + Number(b.totalPrice || 0));
+      }
+      if (b.paymentStatus === "paid") {
+        revActByAct.set(id, (revActByAct.get(id) || 0) + Number(b.totalPrice || 0));
       }
     }
 
@@ -289,17 +298,16 @@ const getWorkshopStats = async (req, res) => {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 8);
 
-    // 10) peak hours per aktivitet (startAt hour)
+    // ─── 9) Peak hours per aktivitet (bekräftade) ───────────────────────────
     const peakByActHour = new Map();
-    for (const b of all) {
+    for (const b of confirmedBookings) {
       const id = String(b.activityId || "");
       if (!id) continue;
-      const h = new Date(b.startAt).getHours();
+      const h   = new Date(b.startAt).getHours();
       const key = `${id}__${h}`;
       peakByActHour.set(key, (peakByActHour.get(key) || 0) + 1);
     }
 
-    // packa till en struktur som är lätt i FE: [{activityId, activityTitle, hours:[{hour,count}]}]
     const peakHoursPerActivity = activities.map((a) => {
       const hours = Array.from({ length: 24 }).map((_, hour) => ({
         hour,
@@ -308,35 +316,42 @@ const getWorkshopStats = async (req, res) => {
       return { activityId: String(a._id), activityTitle: a.title, hours };
     });
 
-    // 11) bokningar per veckodag (0=sön..6=lör)
+    // ─── 10) Bokningar per veckodag (bekräftade) ─────────────────────────────
     const weekdayCounts = Array.from({ length: 7 }).map((_, d) => ({
       weekday: d,
       count: 0,
     }));
-    for (const b of all) {
+    for (const b of confirmedBookings) {
       const wd = new Date(b.startAt).getDay();
       weekdayCounts[wd].count += 1;
     }
 
-    // 12) tidsserie för “vald period” (bucket)
+    // ─── 11) Tidsserie (bucket) ───────────────────────────────────────────────
+    // Inkluderar bekräftade + avbokade + väntande separat
     const seriesMap = new Map();
     for (const b of all) {
-      const key = makeBucketKey(b.startAt, groupBy);
+      const key  = makeBucketKey(b.startAt, groupBy);
       const prev = seriesMap.get(key) || {
         key,
-        bookings: 0,
+        confirmed: 0,
+        pending: 0,
         cancellations: 0,
         preliminaryRevenue: 0,
         actualRevenue: 0,
+        pendingRevenue: 0,
       };
 
-      if (b.status === "cancelled") prev.cancellations += 1;
-      else prev.bookings += 1;
-
-      if (b.status === "active") {
+      if (isCancelled(b)) {
+        prev.cancellations += 1;
+      } else if (isPending(b)) {
+        prev.pending       += 1;
+        prev.pendingRevenue += Number(b.totalPrice || 0);
+        // betald trots obesvarat mail räknas som faktisk omsättning
+        if (b.paymentStatus === "paid") prev.actualRevenue += Number(b.totalPrice || 0);
+      } else if (isConfirmed(b)) {
+        prev.confirmed          += 1;
         prev.preliminaryRevenue += Number(b.totalPrice || 0);
-        if (b.paymentStatus === "paid")
-          prev.actualRevenue += Number(b.totalPrice || 0);
+        if (b.paymentStatus === "paid") prev.actualRevenue += Number(b.totalPrice || 0);
       }
 
       seriesMap.set(key, prev);
@@ -346,46 +361,41 @@ const getWorkshopStats = async (req, res) => {
       a.key.localeCompare(b.key),
     );
 
-    // 13) utnyttjad kapacitet (MVP)
-    // bookedUnits = antal bokningsdokument (live+archive) som är active inom perioden
-    // capacityUnits = sum(activity.tracks) * antal “boknings-slots” i perioden (förenklad)
-    // Vi kör förenklat: capacityUnits = totalTracks * dayCount * 8 (antag 8 slots/dag) om du inte vill räkna availability.
-    // För att slippa "ljuga" visar vi både "approx" och "bookedUnits".
-    const bookedUnits = all.filter((b) => b.status === "active").length;
-    const totalTracks = activities.reduce(
-      (s, a) => s + Number(a.tracks || 0),
-      0,
-    );
+    // ─── 12) Utnyttjad kapacitet (approximation) ─────────────────────────────
+    // Baseras på bekräftade bokningar mot totalt antal tillgängliga resurser
+    const bookedUnits  = totalConfirmed;
+    const totalTracks  = activities
+      .filter((a) => a.bookingUnit !== "per_staff") // personal räknas inte som "banor"
+      .reduce((s, a) => s + Number(a.tracks || 0), 0);
 
-    const approxSlotsPerDay = 8;
-    const capacityUnitsApprox = totalTracks * dayCount * approxSlotsPerDay;
-
+    const approxSlotsPerDay    = 8;
+    const capacityUnitsApprox  = totalTracks * dayCount * approxSlotsPerDay;
     const utilizationApproxPct =
       capacityUnitsApprox > 0 ? (bookedUnits / capacityUnitsApprox) * 100 : 0;
 
-    // 14) framåtblick: mest bokade dagar kommande 7 dagar (live Booking only)
-    const todayISO = toISODateLocal(new Date());
-    const to7 = addDaysISO(todayISO, 7);
+    // ─── 13) Framåtblick: mest bokade dagar kommande 7 dagar ─────────────────
+    const todayISO  = toISODateLocal(new Date());
+    const to7       = addDaysISO(todayISO, 7);
     const futureFrom = startOfLocalDay(todayISO);
-    const futureTo = endOfLocalDay(to7);
+    const futureTo   = endOfLocalDay(to7);
 
     const future = await Booking.find({
       workshopId: wsId,
+      status: { $in: CONFIRMED_STATUSES }, // bara bekräftade framåt
       startAt: { $lte: futureTo },
-      endAt: { $gte: futureFrom },
+      endAt:   { $gte: futureFrom },
     })
-      .select("activityId startAt status")
+      .select("activityId startAt")
       .lean();
 
     const futureByDay = new Map();
     for (const b of future) {
       const dayKey = toISODateLocal(new Date(b.startAt));
-      const actId = String(b.activityId || "");
+      const actId  = String(b.activityId || "");
       const mapKey = `${dayKey}__${actId}`;
       futureByDay.set(mapKey, (futureByDay.get(mapKey) || 0) + 1);
     }
 
-    // gör en struktur: [{date, total, activities:[{activityTitle,count}]}]
     const tmp = new Map();
     for (const [k, count] of futureByDay.entries()) {
       const [date, actId] = k.split("__");
@@ -402,21 +412,33 @@ const getWorkshopStats = async (req, res) => {
       .sort((a, b) => b.total - a.total)
       .slice(0, 7);
 
+    // ─── Svar ─────────────────────────────────────────────────────────────────
     return res.json({
       ok: true,
       meta: { archivedMovedNow: archiveResult.moved },
 
       kpis: {
-        totalBookings,
+        // Bekräftade (verkliga) bokningar
+        totalBookings: totalConfirmed,
+        // Väntande (skapade men ej e-postbekräftade)
+        totalPending,
+        // Avbokade
         totalCancellations,
         cancellationRate,
-        preliminaryRevenue,
-        actualRevenue,
+
+        // Omsättning
+        preliminaryRevenue, // bekräftade, oavsett betalstatus
+        actualRevenue,      // bekräftade + betalda
+        pendingRevenue,     // potentiell omsättning från väntande
+
+        // Övriga nyckeltal
         avgBookingsPerDay,
         avgLeadTimeHours,
         payOnsiteCount,
         payOnlineCount,
         unpaidAttention,
+
+        // Kapacitet
         utilizationApproxPct,
         bookedUnits,
         capacityUnitsApprox,

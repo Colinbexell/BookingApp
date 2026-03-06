@@ -1,6 +1,7 @@
 const Activity = require("../models/activityModel");
 const Workshop = require("../models/workshopModel");
 const Booking = require("../models/bookingModel");
+const cloudinary = require("cloudinary").v2;
 
 // ---- validators ----
 const isValidHHMM = (s) =>
@@ -265,6 +266,20 @@ const deleteActivity = async (req, res) => {
       return res.status(404).json({ ok: false, message: "Activity not found" });
     }
 
+    // Ta bort bilden från Cloudinary om den finns
+    if (deleted.imageUrl && deleted.imageUrl.includes("cloudinary.com")) {
+      try {
+        // Extrahera public_id från URL:en (allt efter /upload/vXXXXXX/)
+        const match = deleted.imageUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.[a-z]+$/i);
+        if (match) {
+          await cloudinary.uploader.destroy(match[1]);
+        }
+      } catch (cloudErr) {
+        console.error("Kunde inte ta bort bild från Cloudinary:", cloudErr.message);
+        // Vi returnerar ändå ok:true — aktiviteten är borttagen
+      }
+    }
+
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });
@@ -351,8 +366,7 @@ const getActivityAvailability = async (req, res) => {
     const fromStart = makeLocalDate(from, "00:00");
     const toStart = makeLocalDate(to, "00:00");
 
-    const bookingFilter = {
-  activityId: act._id,
+  const bookingFilter = {
   status: { $in: ["active", "pending", "confirmed"] },
   startAt: { $lt: toStart },
   endAt: { $gt: fromStart },
@@ -367,10 +381,13 @@ if (act.bookingUnit === "per_staff") {
     });
   }
   bookingFilter.staffId = staffId;
+  // OBS: activityId filtreras INTE — vi vill kolla om utföraren är
+  // upptagen oavsett vilken aktivitet den är bokad på.
+} else {
+  bookingFilter.activityId = act._id;
 }
 
 const bookings = await Booking.find(bookingFilter).select("startAt endAt partySize");
-
     const now = new Date();
     const leadMinutes = 0; // ändra till t.ex. 10 om du vill ha framförhållning
     const minAllowedStart = new Date(now.getTime() + leadMinutes * 60_000);

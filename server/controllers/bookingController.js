@@ -132,10 +132,13 @@ const createBooking = async (req, res) => {
     }
 
     const slotMinutes = act.bookingRules?.slotMinutes || 60;
-    const slots = Number(durationSlots);
-    if (![1, 2].includes(slots))
-      return res.status(400).json({ message: "durationSlots must be 1 or 2" });
-
+const minSlots = act.bookingRules?.minSlots || 1;
+const maxSlots = act.bookingRules?.maxSlots || 2;
+const slots = Number(durationSlots);
+if (!Number.isInteger(slots) || slots < minSlots || slots > maxSlots)
+  return res.status(400).json({
+    message: `durationSlots måste vara mellan ${minSlots} och ${maxSlots}`,
+  });
     const startAt = new Date(startISO);
     if (Number.isNaN(startAt.getTime()))
       return res.status(400).json({ message: "startISO invalid date" });
@@ -167,12 +170,11 @@ const createBooking = async (req, res) => {
     return res.status(400).json({ message: "Ogiltig utförare för denna aktivitet" });
 
   const conflict = await Booking.findOne({
-    activityId: act._id,
-    staffId,
-    status: { $in: ["active", "pending", "confirmed"] },
-    startAt: { $lt: endAt },
-    endAt: { $gt: startAt },
-  });
+  staffId,
+  status: { $in: ["active", "pending", "confirmed"] },
+  startAt: { $lt: endAt },
+  endAt: { $gt: startAt },
+});
   if (conflict)
     return res.status(409).json({
       message: "Den valda utföraren är inte tillgänglig den valda tiden",

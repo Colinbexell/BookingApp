@@ -3,7 +3,6 @@ const dotenv = require("dotenv").config();
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
 const app = express();
-const path = require("path");
 const cors = require("cors");
 
 // Använder GOOGLE DNS. Ta bort vid produktion
@@ -30,7 +29,6 @@ app.post(
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 app.use("/user", require("./routes/authRoutes"));
 app.use("/company", require("./routes/companyRoutes"));
