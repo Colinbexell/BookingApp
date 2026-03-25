@@ -11,14 +11,6 @@ const {
   updateWorkshopSettings,
 } = require("../controllers/workshopController");
 
-// CORS config, ändra origin till domänen vid produktion
-router.use(
-  cors({
-    credentials: true,
-    origin: "http://localhost:5173",
-  }),
-);
-
 // Skapa workshop
 router.post("/create", createWorkshop);
 

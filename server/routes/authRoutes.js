@@ -6,14 +6,6 @@ const rateLimit = require("express-rate-limit");
 // Importer routes controllers
 const { registerUser, loginUser } = require("../controllers/authController");
 
-// CORS config, ändra origin till domänen vid produktion
-router.use(
-  cors({
-    credentials: true,
-    origin: "http://localhost:5173",
-  })
-);
-
 // Rate limiting for login attempts
 const loginLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minut

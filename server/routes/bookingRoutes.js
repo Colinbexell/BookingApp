@@ -7,15 +7,8 @@ const {
   listBookingsForWorkshop,
   cancelBookings,
   markBookingsPaid,
-  confirmBooking
+  confirmBooking,
 } = require("../controllers/bookingController");
-
-router.use(
-  cors({
-    credentials: true,
-    origin: "http://localhost:5173",
-  })
-);
 
 router.post("/create", createBooking);
 router.get("/workshop/:workshopId", listBookingsForWorkshop);

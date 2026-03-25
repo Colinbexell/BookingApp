@@ -2,24 +2,28 @@ const express = require("express");
 const dotenv = require("dotenv").config();
 const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
-const app = express();
 const cors = require("cors");
+const app = express();
 
-// Använder GOOGLE DNS. Ta bort vid produktion
 const dns = require("dns");
 dns.setServers(["8.8.8.8", "8.8.4.4"]);
 
+const { loadOrigins, isAllowed } = require("./controllers/corsController");
 
-
-// Middleware
+// Dynamisk CORS — kollar mot in-memory cache (synkad med DB)
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Tillåt requests utan origin (t.ex. Postman, server-till-server)
+      if (!origin) return callback(null, true);
+      if (isAllowed(origin)) return callback(null, true);
+      callback(new Error(`CORS blockerad: ${origin}`));
+    },
     credentials: true,
   }),
 );
 
-// Måste ligga före express.json
+// Webhook måste ligga före express.json
 app.post(
   "/payment/webhook",
   express.raw({ type: "application/json" }),
@@ -39,6 +43,7 @@ app.use("/booking", require("./routes/bookingRoutes"));
 app.use("/upload", require("./routes/uploadRoutes"));
 app.use("/stats", require("./routes/statsRoutes"));
 app.use("/payment", require("./routes/paymentRoutes"));
+app.use("/cors", require("./routes/corsRoutes")); // ← ny
 
 const connectDB = async (retries = 5) => {
   for (let i = 0; i < retries; i++) {
@@ -48,14 +53,15 @@ const connectDB = async (retries = 5) => {
       return;
     } catch (err) {
       console.error(`DB-försök ${i + 1} misslyckades:`, err.message);
-      if (i < retries - 1) await new Promise(r => setTimeout(r, 3000));
+      if (i < retries - 1) await new Promise((r) => setTimeout(r, 3000));
     }
   }
   console.error("Kunde inte ansluta till databasen, stänger av.");
   process.exit(1);
 };
 
-connectDB().then(() => {
+connectDB().then(async () => {
+  await loadOrigins(); // ← ladda whitelist innan servern startar
   app.listen(6969, () => {
     console.log("Server is running on port 6969");
   });

@@ -104,8 +104,8 @@ const createBooking = async (req, res) => {
         .json({ message: "paymentMethod must be onsite|online" });
 
     const act = await Activity.findById(activityId).select(
-  "workshopId bookingRules pricingRules tracks bookingUnit partyRules takesPayment title staffIds",
-);
+      "workshopId bookingRules pricingRules tracks bookingUnit partyRules takesPayment title staffIds",
+    );
 
     if (!act) return res.status(400).json({ message: "Invalid activityId" });
 
@@ -132,13 +132,13 @@ const createBooking = async (req, res) => {
     }
 
     const slotMinutes = act.bookingRules?.slotMinutes || 60;
-const minSlots = act.bookingRules?.minSlots || 1;
-const maxSlots = act.bookingRules?.maxSlots || 2;
-const slots = Number(durationSlots);
-if (!Number.isInteger(slots) || slots < minSlots || slots > maxSlots)
-  return res.status(400).json({
-    message: `durationSlots måste vara mellan ${minSlots} och ${maxSlots}`,
-  });
+    const minSlots = act.bookingRules?.minSlots || 1;
+    const maxSlots = act.bookingRules?.maxSlots || 2;
+    const slots = Number(durationSlots);
+    if (!Number.isInteger(slots) || slots < minSlots || slots > maxSlots)
+      return res.status(400).json({
+        message: `durationSlots måste vara mellan ${minSlots} och ${maxSlots}`,
+      });
     const startAt = new Date(startISO);
     if (Number.isNaN(startAt.getTime()))
       return res.status(400).json({ message: "startISO invalid date" });
@@ -160,39 +160,43 @@ if (!Number.isInteger(slots) || slots < minSlots || slots > maxSlots)
     }
 
     if (act.bookingUnit === "per_staff") {
-  if (!staffId)
-    return res.status(400).json({ message: "staffId krävs för denna aktivitet" });
+      if (!staffId)
+        return res
+          .status(400)
+          .json({ message: "staffId krävs för denna aktivitet" });
 
-  const isValidStaff = (act.staffIds || []).some(
-    (id) => id.toString() === staffId
-  );
-  if (!isValidStaff)
-    return res.status(400).json({ message: "Ogiltig utförare för denna aktivitet" });
+      const isValidStaff = (act.staffIds || []).some(
+        (id) => id.toString() === staffId,
+      );
+      if (!isValidStaff)
+        return res
+          .status(400)
+          .json({ message: "Ogiltig utförare för denna aktivitet" });
 
-  const conflict = await Booking.findOne({
-  staffId,
-  status: { $in: ["active", "pending", "confirmed"] },
-  startAt: { $lt: endAt },
-  endAt: { $gt: startAt },
-});
-  if (conflict)
-    return res.status(409).json({
-      message: "Den valda utföraren är inte tillgänglig den valda tiden",
-    });
-} else {
-  const overlapping = await Booking.find({
-    activityId: act._id,
-    status: { $in: ["active", "pending", "confirmed"] },
-    startAt: { $lt: endAt },
-    endAt: { $gt: startAt },
-  }).select("partySize");
+      const conflict = await Booking.findOne({
+        staffId,
+        status: { $in: ["active", "pending", "confirmed"] },
+        startAt: { $lt: endAt },
+        endAt: { $gt: startAt },
+      });
+      if (conflict)
+        return res.status(409).json({
+          message: "Den valda utföraren är inte tillgänglig den valda tiden",
+        });
+    } else {
+      const overlapping = await Booking.find({
+        activityId: act._id,
+        status: { $in: ["active", "pending", "confirmed"] },
+        startAt: { $lt: endAt },
+        endAt: { $gt: startAt },
+      }).select("partySize");
 
-  if (overlapping.length + 1 > Number(act.tracks || 0)) {
-    return res.status(409).json({
-      message: "Den tiden har inte tillräcklig kapacitet kvar",
-    });
-  }
-}
+      if (overlapping.length + 1 > Number(act.tracks || 0)) {
+        return res.status(409).json({
+          message: "Den tiden har inte tillräcklig kapacitet kvar",
+        });
+      }
+    }
 
     const currency = act.pricingRules?.currency || "SEK";
     const unitPrices = [];
@@ -272,7 +276,8 @@ if (!Number.isInteger(slots) || slots < minSlots || slots > maxSlots)
     });
 
     // Skicka bekräftelsemail (utan att blockera svaret)
-    const confirmUrl = `${process.env.CLIENT_URL}/booking/confirm/${confirmationToken}`;
+    const clientOrigin = req.headers.origin;
+    const confirmUrl = `${clientOrigin}/booking/confirm/${confirmationToken}`;
     console.log("🔗 Confirm URL i mailet:", confirmUrl);
     sendBookingConfirmationRequest({
       booking: doc,
@@ -337,14 +342,14 @@ const listBookingsForWorkshop = async (req, res) => {
       { $unwind: { path: "$activity", preserveNullAndEmptyArrays: true } },
 
       {
-  $lookup: {
-    from: "staffs",
-    localField: "staffId",
-    foreignField: "_id",
-    as: "staffDoc",
-  },
-},
-{ $unwind: { path: "$staffDoc", preserveNullAndEmptyArrays: true } },
+        $lookup: {
+          from: "staffs",
+          localField: "staffId",
+          foreignField: "_id",
+          as: "staffDoc",
+        },
+      },
+      { $unwind: { path: "$staffDoc", preserveNullAndEmptyArrays: true } },
       {
         $addFields: {
           customerNameNorm: { $trim: { input: "$customerName" } },
